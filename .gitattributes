@@ -1,0 +1,5 @@
+# Store text files with LF line endings on every system.
+* text=auto eol=lf
+*.svg text eol=lf
+*.png binary
+*.jpg binary
