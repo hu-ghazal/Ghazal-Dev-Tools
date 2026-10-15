@@ -21,7 +21,7 @@ Each tool has its own folder with a README that says what it does, how to instal
 
 | Tool | Kind | What it does |
 |---|---|---|
-| [adaptive-effort](mods/adaptive-effort) | Claude Code mod | Lets Claude choose its own reasoning effort by clear rules, with a pane to make each level harder or easier to reach |
+| 🏎️ [adaptive-effort](mods/adaptive-effort) | Claude Code mod | An automatic gearbox for Claude's thinking: Claude shifts its own reasoning effort by clear rules, and a pane makes each gear harder or easier to reach |
 
 ## Getting started
 

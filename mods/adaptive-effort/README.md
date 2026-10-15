@@ -1,11 +1,38 @@
-# adaptive-effort
+<p align="center">
+  <img src="assets/banner.svg" alt="adaptive-effort: Claude shifts its own thinking gear" width="100%">
+</p>
 
-A Claude Code mod that lets Claude choose its own reasoning effort, step by step, by clear rules you control.
+<h1 align="center">🏎️ adaptive-effort</h1>
 
-Claude spends more thinking on hard work and less on easy work. You decide how hard each level is to reach, from a
-side pane, and the mod keeps the switching calm and the expensive levels short.
+<p align="center">
+  <b>An automatic gearbox for Claude's thinking.</b><br>
+  A Claude Code mod that lets Claude shift its own reasoning effort, by clear rules you control.
+</p>
 
-## How it works
+<p align="center">
+  <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
+  <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
+  <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
+  <img alt="License PolyForm Noncommercial" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-2b2f36?style=for-the-badge">
+</p>
+
+---
+
+Claude spends more thinking on hard work and less on easy work, like an automatic gearbox that shifts up for a climb
+and back down on the straight. You decide how hard each gear is to reach, from a side pane, and the mod keeps the
+shifting smooth and the most expensive gear short.
+
+## ✨ Highlights
+
+- 🔴 **Auto mode.** Claude picks its own gear for the work in front of it: medium, high, xhigh or max.
+- ⚙️ **Clear shift rules.** Each gear has counted conditions (attempts, files, systems, steps), not vague feelings.
+- 🎚️ **You set the difficulty.** Make max, xhigh or high harder or easier to reach, one step at a time.
+- ⏱️ **Smooth shifting.** At least 60 seconds between changes, so the effort never flickers.
+- 🛑 **Rev limiter on max.** Ten minutes in a row at most, then back to medium until your next prompt.
+- 💰 **Budget aware.** When your weekly usage runs ahead of the week, every gear gets one step harder to reach.
+- 🔒 **Local and free.** No model calls, no network requests.
+
+## 🧭 How it works
 
 1. **Beside every prompt**, the mod adds the effort rules and asks Claude to answer with one Bash call:
 
@@ -28,7 +55,7 @@ side pane, and the mod keeps the switching calm and the expensive levels short.
 The answer is free-standing: other words on the echo line are ignored, so the request can share a line with any other
 check you already ask Claude to echo.
 
-### Limits the mod applies
+### 🛡️ Limits the mod applies
 
 - **60 seconds between changes**, so the effort does not flicker.
 - **Max for at most 10 minutes in a row**, then medium until your next prompt.
@@ -38,11 +65,11 @@ check you already ask Claude to echo.
 - **Subagent note:** over half of the week's limit, a call that starts a native subagent carries a note suggesting a
   lighter helper. It is never blocked.
 
-### Models
+### 🤖 Models
 
 Opus, Fable and Sonnet 5 and later, from medium to max. Other models and subagent steps are left alone.
 
-## The Thinking effort pane
+## 🎛️ The Thinking effort pane
 
 The pane opens at session start (`/adaptive-effort pane` brings it to the front). It shows:
 
@@ -55,7 +82,7 @@ Each step **Harder** raises that level's counts by one; **Easier** lowers them (
 Max also makes a design decision count for max only when it spans that many systems. A change during a turn reaches
 Claude at its next tool call.
 
-## Commands
+## ⌨️ Commands
 
 | Command | Does |
 |---|---|
@@ -66,7 +93,7 @@ Claude at its next tool call.
 | `/adaptive-effort reset` | Returns to the standard thresholds |
 | `/adaptive-effort off` / `on` | Turns the mod off or on |
 
-## Install
+## 📦 Install
 
 This is a Claude Code plugin with a hooks module (a mod). Plugin support and the mod API depend on your Claude Code
 version; check the plugin documentation for your build.
@@ -80,7 +107,7 @@ version; check the plugin documentation for your build.
 2. Generate the API types for your build (they are not stored in this repository) by running `/plugin-types` in a
    session, pointed at this folder.
 
-## Test
+## 🧪 Test
 
 ```bash
 claude plugin validate path/to/adaptive-effort
@@ -90,11 +117,11 @@ claude plugin test path/to/adaptive-effort
 The tests cover answer parsing, the hold and the max limit, the budget step, the pane and its buttons, saved defaults,
 model ranges and the subagent note.
 
-## Privacy and cost
+## 🔒 Privacy and cost
 
 The mod makes no model calls and no network requests. It reads the usage limits Claude Code already reports, and keeps
 its settings in Claude Code's local plugin storage.
 
-## License
+## 📜 License
 
 PolyForm Noncommercial 1.0.0, as the rest of this repository. See [LICENSE](../../LICENSE).

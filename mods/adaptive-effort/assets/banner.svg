@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360" role="img" aria-label="adaptive-effort: Claude shifts its own thinking gear">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16181d"/>
+      <stop offset="1" stop-color="#07080a"/>
+    </linearGradient>
+    <pattern id="carbon" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="12" height="12" fill="#101216"/>
+      <rect width="6" height="12" fill="#14171c"/>
+    </pattern>
+    <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a3f47"/>
+      <stop offset="0.5" stop-color="#1d2026"/>
+      <stop offset="1" stop-color="#2b2f36"/>
+    </linearGradient>
+    <radialGradient id="knob" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.25" stop-color="#c9ced6"/>
+      <stop offset="0.7" stop-color="#5b616b"/>
+      <stop offset="1" stop-color="#23262b"/>
+    </radialGradient>
+    <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#c8ccd2"/>
+      <stop offset="0.55" stop-color="#8a9099"/>
+      <stop offset="1" stop-color="#e9ecef"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#fff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="redglow" r="0.5">
+      <stop offset="0" stop-color="#ff2a2a" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ff2a2a" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="titleclip">
+      <text x="520" y="170" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="78" font-weight="800" font-style="italic" letter-spacing="1">adaptive-effort</text>
+    </clipPath>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <!-- Background: carbon weave and a red racing stripe -->
+  <rect width="1280" height="360" fill="url(#bg)"/>
+  <rect width="1280" height="360" fill="url(#carbon)" opacity="0.55"/>
+  <rect x="0" y="318" width="1280" height="6" fill="#e10600"/>
+  <rect x="0" y="328" width="1280" height="2" fill="#e10600" opacity="0.6"/>
+
+  <!-- Shift gate plate -->
+  <rect x="70" y="40" width="380" height="270" rx="28" fill="url(#plate)" stroke="#555b64" stroke-width="2"/>
+  <rect x="82" y="52" width="356" height="246" rx="20" fill="none" stroke="#000" stroke-opacity="0.45" stroke-width="2"/>
+  <!-- H-pattern slot: medium / high on the left, xhigh / max on the right -->
+  <path d="M190 100 V240 M190 170 H330 M330 100 V240" stroke="#050607" stroke-width="30" stroke-linecap="round" fill="none"/>
+  <path d="M190 100 V240 M190 170 H330 M330 100 V240" stroke="#2a2e35" stroke-width="2" stroke-linecap="round" fill="none" transform="translate(0,-15)" opacity="0.6"/>
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif" font-weight="700" font-size="20" fill="#9aa1ab" text-anchor="middle">
+    <text x="150" y="107">MED</text>
+    <text x="150" y="247">HIGH</text>
+    <text x="372" y="107">XHI</text>
+    <text x="372" y="247" fill="#ff3b30">MAX
+      <animate attributeName="opacity" values="0.55;0.55;1;1;0.55;0.55" keyTimes="0;0.58;0.6;0.82;0.84;1" dur="10s" repeatCount="indefinite"/>
+    </text>
+  </g>
+  <!-- Red glow behind MAX while the knob sits there -->
+  <circle cx="330" cy="240" r="60" fill="url(#redglow)" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.58;0.6;0.82;0.84;1" dur="10s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Shift knob: travels medium, high, xhigh, max, and back -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="10s" repeatCount="indefinite"
+      values="190 100; 190 100; 190 170; 190 240; 190 240; 190 170; 330 170; 330 100; 330 100; 330 170; 330 240; 330 240; 330 170; 190 170; 190 100; 190 100"
+      keyTimes="0; 0.08; 0.12; 0.16; 0.28; 0.32; 0.36; 0.4; 0.52; 0.56; 0.6; 0.82; 0.86; 0.9; 0.94; 1"/>
+    <ellipse cx="4" cy="8" rx="30" ry="12" fill="#000" opacity="0.5" filter="url(#soft)"/>
+    <circle r="30" fill="url(#knob)" stroke="#16181c" stroke-width="2"/>
+    <circle r="30" fill="none" stroke="#e10600" stroke-width="3" opacity="0.85"/>
+    <circle r="9" fill="#e10600"/>
+  </g>
+
+  <!-- Title with a moving shine -->
+  <text x="520" y="170" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="78" font-weight="800" font-style="italic" letter-spacing="1" fill="url(#chrome)">adaptive-effort</text>
+  <g clip-path="url(#titleclip)">
+    <rect x="-200" y="80" width="160" height="110" fill="url(#shine)" transform="skewX(-20)">
+      <animate attributeName="x" values="300;1500;1500" keyTimes="0;0.35;1" dur="4s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <text x="524" y="222" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" fill="#c9ced6" letter-spacing="0.5">Claude shifts its own thinking gear.</text>
+  <text x="524" y="262" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#7d848e" letter-spacing="0.5">medium · high · xhigh · max — you set how hard each gear is to reach</text>
+
+  <!-- AUTO light: red, flashing -->
+  <g transform="translate(1090,58)">
+    <rect x="-6" y="-6" width="148" height="60" rx="30" fill="#ff1a1a" opacity="0.35" filter="url(#soft)">
+      <animate attributeName="opacity" values="0.6;0.05;0.6" dur="1.2s" repeatCount="indefinite"/>
+    </rect>
+    <rect width="136" height="48" rx="24" fill="#2a0303" stroke="#ff3b30" stroke-width="2"/>
+    <circle cx="28" cy="24" r="9" fill="#ff1a1a">
+      <animate attributeName="opacity" values="1;0.15;1" dur="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <text x="84" y="33" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="3" fill="#ff3b30">AUTO
+      <animate attributeName="fill" values="#ff3b30;#5a0b08;#ff3b30" dur="1.2s" repeatCount="indefinite"/>
+    </text>
+  </g>
+</svg>
