@@ -17,6 +17,12 @@ was not needed, or reported work as done when it was not. Use what helps you, im
 
 Each tool has its own folder with a README that says what it does, how to install it and how to test it.
 
+### Tools
+
+| Tool | Kind | What it does |
+|---|---|---|
+| [adaptive-effort](mods/adaptive-effort) | Claude Code mod | Lets Claude choose its own reasoning effort by clear rules, with a pane to make each level harder or easier to reach |
+
 ## Getting started
 
 1. Clone the repository.
