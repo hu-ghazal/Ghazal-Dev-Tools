@@ -74,23 +74,38 @@ export function dwell(
 /** The longest run of max. */
 export const MAX_HOLD_MS = 600_000
 
-/** When the running max was first sent (`since`) and whether max is blocked (`capped`). */
-export type MaxClock = { since?: number; capped: boolean }
+/**
+ * When the running max was first sent (`since`), whether max is blocked (`capped`), and when the cap last stopped a
+ * run of max during a turn (`endedAt`, kept until a new run starts).
+ */
+export type MaxClock = { since?: number; capped: boolean; endedAt?: number }
 
 /**
  * Caps a run of max at MAX_HOLD_MS: then max drops to medium and stays blocked until a new prompt (`fresh`). A new
  * prompt lifts the cap only once the run has ended; it never lengthens a run inside its limit.
+ * A max answer given before the cap stopped its run (`answeredAt` < `endedAt`) is spent: it sends medium on the new
+ * prompt and after it, so only a max answered again starts a new run. The limit counts wall time, so a run that ran
+ * out while idle between turns is not spent: the carried max starts a new run on the next prompt.
  */
-export function capMax(desired: Level, clock: MaxClock, now: number, fresh: boolean): { effort: Level; clock: MaxClock } {
+export function capMax(
+  desired: Level,
+  clock: MaxClock,
+  now: number,
+  fresh: boolean,
+  answeredAt?: number,
+): { effort: Level; clock: MaxClock } {
   const expired = clock.since !== undefined && now - clock.since >= MAX_HOLD_MS
-  if (!clock.capped && !expired) return { effort: desired, clock }
-  if (!fresh) return { effort: desired === 'max' ? 'medium' : desired, clock: { ...clock, capped: true } }
-  return { effort: desired, clock: { capped: false } }
+  const stale = desired === 'max' && clock.endedAt !== undefined && (answeredAt === undefined || answeredAt < clock.endedAt)
+  if (!clock.capped && !expired) return { effort: stale ? 'medium' : desired, clock }
+  if (!fresh) {
+    return { effort: desired === 'max' ? 'medium' : desired, clock: { ...clock, capped: true, endedAt: clock.endedAt ?? now } }
+  }
+  return { effort: stale ? 'medium' : desired, clock: clock.endedAt === undefined ? { capped: false } : { capped: false, endedAt: clock.endedAt } }
 }
 
-/** A run of max starts when max is first sent and ends when any other effort is sent. */
+/** A run of max starts when max is first sent and ends when any other effort is sent; a new run forgets `endedAt`. */
 export function trackMax(clock: MaxClock, sent: Level, now: number): MaxClock {
-  if (sent !== 'max') return { capped: clock.capped }
+  if (sent !== 'max') return clock.endedAt === undefined ? { capped: clock.capped } : { capped: clock.capped, endedAt: clock.endedAt }
   return { since: clock.since ?? now, capped: clock.capped }
 }
 

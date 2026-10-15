@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
 import { parseEffortAnswer } from './classify'
+import { manifest } from './version'
 
 
 const OPUS = 'claude-opus-5-5'
@@ -159,6 +160,118 @@ describe('usage control', () => {
     await prompt($)
     await step($, 0)
     expect(seen.efforts.at(-1), 'answer.test.ts:new-prompt').toBe('max')
+  })
+
+  // A max answer whose run used its 10 minutes is spent: a new prompt does not bring it back (a turn could start at the old
+  // max, and its 60 s hold kept a new, lower answer waiting).
+  test('R1: a max answer spent by its 10 minutes stays medium on the next prompt', async ($, on) => {
+    const clock = mock.clock(on)
+    const seen = harness(on)
+    await start($)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(10 * MIN)
+    await step($, 1)
+    await clock.advance(20 * MIN)
+    await prompt($)
+    await step($, 0)
+    await step($, 1)
+    expect(seen.efforts, 'answer.test.ts:R1').toEqual(['max', 'medium', 'medium', 'medium'])
+  })
+
+  test('R2: after the spent max, an answer of high applies at the next step', async ($, on) => {
+    const clock = mock.clock(on)
+    const seen = harness(on)
+    await start($)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(10 * MIN)
+    await step($, 1)
+    await clock.advance(20 * MIN)
+    await prompt($)
+    await step($, 0)
+    await answer($, 'high')
+    await step($, 1)
+    expect(seen.efforts, 'answer.test.ts:R2').toEqual(['max', 'medium', 'medium', 'high'])
+  })
+
+  test('R3: a new max answer after the spent run starts a new run of at most 10 minutes', async ($, on) => {
+    const clock = mock.clock(on)
+    const seen = harness(on)
+    await start($)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(10 * MIN)
+    await step($, 1)
+    await clock.advance(20 * MIN)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(10 * MIN - 1)
+    await step($, 1)
+    await clock.advance(1)
+    await step($, 2)
+    expect(seen.efforts, 'answer.test.ts:R3').toEqual(['max', 'medium', 'max', 'max', 'medium'])
+  })
+
+  test('R4: a max run still inside its 10 minutes carries on over a new prompt, and ends at 10 minutes', async ($, on) => {
+    const clock = mock.clock(on)
+    const seen = harness(on)
+    await start($)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(5 * MIN)
+    await prompt($)
+    await step($, 0)
+    await clock.advance(5 * MIN)
+    await step($, 1)
+    expect(seen.efforts, 'answer.test.ts:R4').toEqual(['max', 'max', 'medium'])
+  })
+
+  // The 10 minutes count wall time. A max turn followed by a long idle break is not a run the cap stopped: the carried
+  // max starts a new run on the next prompt, with no detour to medium that would hold a new max answer for 60 s.
+  test('R5: a max answer whose 10 minutes ran out while idle starts a new run on the next prompt', async ($, on) => {
+    const clock = mock.clock(on)
+    const seen = harness(on)
+    await start($)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(30 * MIN)
+    await prompt($)
+    await step($, 0)
+    await clock.advance(10 * MIN - 1)
+    await step($, 1)
+    await clock.advance(1)
+    await step($, 2)
+    expect(seen.efforts, 'answer.test.ts:R5').toEqual(['max', 'max', 'max', 'medium'])
+  })
+
+  test('R6: after the idle break, max answered again applies at once', async ($, on) => {
+    const clock = mock.clock(on)
+    const seen = harness(on)
+    await start($)
+    await prompt($)
+    await answer($, 'max')
+    await step($, 0)
+    await clock.advance(30 * MIN)
+    await prompt($)
+    await step($, 0)
+    await answer($, 'max')
+    await step($, 1)
+    expect(seen.efforts, 'answer.test.ts:R6').toEqual(['max', 'max', 'max'])
+  })
+
+  test('R7: /adaptive-effort names the version the session loaded, from plugin.json', async ($, on) => {
+    mock.clock(on)
+    harness(on)
+    await start($)
+    const text = JSON.stringify(await command($))
+    expect(text.includes(`version ${manifest.version} is on`), 'answer.test.ts:R7').toBe(true)
   })
 
   test('over the weekly budget an answered max stays max: the budget never lowers the effort', async ($, on) => {

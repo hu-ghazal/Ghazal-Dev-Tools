@@ -3,6 +3,17 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.0.1 (2026-10-16)
+
+Fixes to the 10-minute max limit.
+
+- A max answer spent by its 10 minutes now stays medium on the next prompt. Before, a new prompt sent max again for
+  another 10 minutes. Claude has to answer max again to get it back.
+- A max run that ran out while the session sat idle no longer blocks a new max answer.
+- `/adaptive-effort` names the loaded version, so each session shows which build it runs.
+- Tests: seven stories for the max limit and the version line, plus a seeded random sweep of 6,000 events that checks
+  the rules after every step.
+
 ## 1.0.0 (2026-10-15)
 
 First public release.

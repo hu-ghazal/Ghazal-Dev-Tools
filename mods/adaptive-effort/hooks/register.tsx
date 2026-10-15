@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { EffortLevel, Hold, PaceLog } from '../types'
 import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, dwell, isStandard, levelName, levelRules, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, subagentFlag, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SUBAGENT_TOOLS } from './classify'
 import type { Raised, Thresholds } from './classify'
+import { manifest } from './version'
 
 // adaptive-effort: Claude decides its own reasoning effort. Beside each prompt the mod puts the effort rules and asks
 // Claude to answer with `echo "EFFORT=<level>"`; it sends that level on Opus, Fable and Sonnet 5+ main-loop steps (medium
@@ -122,7 +123,7 @@ export const register: Register = on => {
     const flag = subagentFlag((await $.session.usage().catch(() => undefined))?.rateLimits ?? [])
     return {
       text:
-        `adaptive-effort is ${(await read($, enabled)) ? 'on' : 'off'}; last applied effort: ${await read($, level)}.\n` +
+        `version ${manifest.version} is ${(await read($, enabled)) ? 'on' : 'off'}; last applied effort: ${await read($, level)}.\n` +
         `${answer}\nThresholds in force (saved default: ${describe(await read($, saved))}):\n${rules}\n` +
         `Limits: a change waits until the current effort has stood ${MIN_DWELL_MS / 1000} s; max runs at most ${MAX_HOLD_MS / 60_000} minutes in a row.${capped}\n` +
         week +
@@ -227,7 +228,7 @@ export const register: Register = on => {
     const want = Math.min(top, h.answer?.level ?? 0)
     // The 7-day readings are kept for the budget step and /adaptive-effort; the budget never lowers the effort.
     await budget($, now, true)
-    const cap = capMax(applied(want), h.max, now, fresh)
+    const cap = capMax(applied(want), h.max, now, fresh, h.answer?.at)
     fresh = false
     let { current, changedAt } = h
     const held = dwell(current, cap.effort, changedAt, now)

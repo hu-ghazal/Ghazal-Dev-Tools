@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -87,7 +87,7 @@ Claude at its next tool call.
 
 | Command | Does |
 |---|---|
-| `/adaptive-effort` | Shows the effort, Claude's last answer, the thresholds, the limits and the weekly budget |
+| `/adaptive-effort` | Shows the version, the effort, Claude's last answer, the thresholds, the limits and the weekly budget |
 | `/adaptive-effort pane` | Opens or raises the pane |
 | `/adaptive-effort max harder` | Makes a level harder or easier: `max`, `xhigh` or `high`, then `harder` or `easier` |
 | `/adaptive-effort save` | Keeps the current thresholds as the default for new sessions |
