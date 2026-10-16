@@ -3,6 +3,21 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.3.0 (2026-10-16)
+
+An experimental option: break to simple.
+
+- **Settings** has a new checkbox, unchecked by default: **Break to simple (experimental)**. Checked, Claude adds a
+  quick score out of ten when it answers Max, for how well the work splits into clear pieces; score/10 × 0.9 over 0.7
+  sends High to plan, then Medium for each piece, in the same conversation. Otherwise Max stands. The choice is kept for
+  new sessions.
+- The pane shows the last score and what it sent while the option is on.
+- Tests: reading the score, the gate at its edges, off by default, and on from Settings.
+- **Settings fields read as plain words.** Each condition shows its real number ("4 or more files…") instead of a
+  `{n}` placeholder. Write what you want; a number you type becomes that condition's count, and Easier, Harder and
+  the weekly budget still move it from there. A number inside a word or a longer number (v2, 1.5) is never taken.
+- The plugin's types file is self-contained, so `claude plugin validate` passes.
+
 ## 1.2.0 (2026-10-16)
 
 Turn it off and on from the pane.
