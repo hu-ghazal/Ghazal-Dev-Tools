@@ -141,6 +141,41 @@ version; check the plugin documentation for your build.
 2. Generate the API types for your build (they are not stored in this repository) by running `/plugin-types` in a
    session, pointed at this folder.
 
+## 🚀 First run, and after every update
+
+Claude Code reads a plugin when a session starts. A session that was already open when you installed or updated
+adaptive-effort keeps running the build it had, or none, until you reload it.
+
+1. **Load it.** In the open session, run:
+
+   ```text
+   /reload-plugins
+   ```
+
+   or start a new session.
+
+2. **Check the build.** Run `/adaptive-effort`. Its first line names the version this session loaded, for example
+   `version 1.0.2 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
+   back to step 1.
+
+3. **Open the pane.** It opens by itself when a session starts. After a reload, or when it is hidden behind another
+   pane, bring it to the front with:
+
+   ```text
+   /adaptive-effort pane
+   ```
+
+### 🧩 If something does not show
+
+| You see | It means | Do this |
+|---|---|---|
+| `/adaptive-effort` is an unknown command | The session has not loaded the mod | Run `/reload-plugins` or start a new session; check the plugin is installed and enabled |
+| `Thinking effort pane shown.` | The pane is open in front | Nothing to do |
+| `Thinking effort pane is open behind another pane: click its "Thinking effort" tab.` | Another pane is in front of it | Click the **Thinking effort** tab |
+| `the pane is not drawn here` | This surface draws no side pane | Use the commands below (`/adaptive-effort max harder`, `save`, `reset`); the terminal shows the chart as text rows |
+| `No model calls yet since this build loaded.` | The chart has nothing to show yet | Keep working: the chart and table fill in after the next answer |
+| An old version number in `/adaptive-effort` | The session still runs the old build | Run `/reload-plugins` |
+
 ## 🧪 Test
 
 ```bash
