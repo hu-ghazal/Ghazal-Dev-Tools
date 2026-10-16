@@ -243,4 +243,27 @@ describe('controls', () => {
       expect((sent?.context ?? []).join('\n').includes('(general: a quick, clear task)'), `pane.test.ts:saved-definitions-${n}`).toBe(true)
     }
   })
+  // Operator 2026-10-16: "how to turn on and off effort? is it explained in github?!!!" then "yes, update clearly".
+  test('Turn off and Turn on: the button, the choice kept for new sessions, and the command', async ($, on) => {
+    mock.clock(on)
+    mock.store(on)
+    harness(on)
+    on('prompt.submit', ($: any, e: any) => ({ text: e.text, context: e.context }))
+    await start($)
+    const label = async (ui: any) => (await ui.find({ type: 'Button', key: 'power' }))?.props?.label
+    const lines = async (text: string) => (((await $.prompt.submit({ text } as any)) as any)?.context ?? []).join('\n').includes('EFFORT')
+    const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    expect([await label(ui), await lines('on')], 'pane.test.ts:on-off:on').toEqual(['Turn off', true])
+    await ui.press({ key: 'power' })
+    expect([await label(ui), (await ui.find({ type: 'Text', text: /^ Off $/ })) !== undefined, (await ui.find({ type: 'Text', text: /^Off: Claude Code keeps its own effort/ })) !== undefined], 'pane.test.ts:on-off:off').toEqual(['Turn on', true, true])
+    await ui.unmount()
+    expect(await lines('while off'), 'pane.test.ts:on-off:nothing-beside-prompt').toBe(false)
+    await start($)
+    const next: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    expect([await label(next), await lines('new session')], 'pane.test.ts:on-off:kept').toEqual(['Turn on', false])
+    await next.unmount()
+    await command($, 'on')
+    await start($)
+    expect(await lines('back on'), 'pane.test.ts:on-off:command-on-kept').toBe(true)
+  })
 })

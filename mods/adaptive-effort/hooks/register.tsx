@@ -38,6 +38,8 @@ const PANE = 'adaptive-effort'
 const PANE_TITLE = 'Thinking effort'
 const STORE_THRESHOLDS = 'thresholds'
 const STORE_DEFINITIONS = 'definitions'
+// On or off, kept for new sessions (operator 2026-10-16: "how to turn on and off effort?").
+const STORE_ENABLED = 'enabled'
 const TITLE: Record<Raised, string> = { max: 'Max', xhigh: 'Extra high', high: 'High' }
 
 /** The weekly budget from the last response's 7-day limit (local; no request); `record` adds the reading. */
@@ -57,6 +59,13 @@ async function saveThresholds($: EngineInterface) {
 
 /** One change to the user's definitions, applied to the current ones (two fields saved before a redraw both keep), now
  *  and as the default of new sessions. */
+/** The pane button and /adaptive-effort on|off: off sends no effort and adds nothing beside the prompt; new sessions keep it. */
+async function power($: EngineInterface, value: boolean) {
+  await update($, enabled, () => value)
+  await $.store.set(STORE_ENABLED, value).catch(() => undefined)
+  if (!value) $.ui.status(undefined)
+}
+
 async function saveDefinitions($: EngineInterface, change: (d: Definitions) => Definitions) {
   const d = await update($, definitions, change)
   await $.store.set(STORE_DEFINITIONS, d)
@@ -117,6 +126,8 @@ export const register: Register = on => {
     const d = validDefinitions(await $.store.get(STORE_DEFINITIONS).catch(() => undefined)) ?? DEFAULT_DEFINITIONS
     await update($, definitions, () => d)
     deliveredDefinitions = d
+    const isOn = (await $.store.get(STORE_ENABLED).catch(() => undefined)) !== false
+    await update($, enabled, () => isOn)
     // The chart this session saved before an app restart, and the saved charts that are spent, deleted.
     const now = await $.clock.now()
     const id = await $.session.id().catch(() => undefined)
@@ -128,7 +139,7 @@ export const register: Register = on => {
     for (const k of await $.store.keys().catch(() => [] as string[])) {
       all.push([k, k.startsWith(STORE_CHART) ? await $.store.get(k).catch(() => undefined) : undefined])
     }
-    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS])) await $.store.delete(k).catch(() => undefined)
+    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS, STORE_ENABLED])) await $.store.delete(k).catch(() => undefined)
     // A session with nothing that draws a pane refuses the open; the controls still work through the command.
     void $.ui.open({ id: PANE, title: PANE_TITLE }).catch(() => undefined)
     return next(e)
@@ -143,11 +154,8 @@ export const register: Register = on => {
   on('command.run', { command: 'adaptive-effort' }, async ($, e) => {
     const [word = '', value = ''] = e.args.trim().toLowerCase().split(/\s+/)
     if (word === 'on' || word === 'off') {
-      await update($, enabled, () => word === 'on')
-      if (word === 'off') {
-        shown = ''
-        $.ui.status(undefined)
-      }
+      await power($, word === 'on')
+      shown = ''
       return { text: `adaptive-effort ${word}.` }
     }
     if (word === 'pane') {
@@ -198,6 +206,7 @@ export const register: Register = on => {
 
   // How the pane says Auto works: a press changes the conditions, and the effort follows when Claude answers by them.
   const SETTINGS_EXPLAIN = `The conditions Claude reads for each level, for code work and for other work. {n} is the count Easier and Harder move, {nth} the same as 3rd, 4th. Enter saves a field (up to ${DEFINITION_MAX} characters) for every session.`
+  const OFF_EXPLAIN = 'Off: Claude Code keeps its own effort, and nothing is added beside your prompts. Turn on lets Claude choose again. New sessions keep this choice.'
   const EXPLAIN = 'Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
   // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
   const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
@@ -221,6 +230,7 @@ export const register: Register = on => {
     const over = overBudget(b)
     const edit = await read($, editing)
     const d = await read($, definitions)
+    const isOn = await read($, enabled)
     // Settings: each definition's code and general text in a field; Enter saves it as the default of every session. The
     // mobile app draws no field, so it says where to edit.
     const field = (l: DefinedLevel, i: number, side: 'code' | 'general') =>
@@ -269,11 +279,18 @@ export const register: Register = on => {
           <Box flexDirection="row" alignItems="center" justifyContent="space-between">
             <Box flexDirection="row" alignItems="center" gap={1}>
               <Text bold color={GRAY}>Effort now</Text>
-              <Text bold color={PILL_TEXT[now]} backgroundColor={COLOR[now]}>{` ${levelName(now)} `}</Text>
+              {isOn ? (
+                <Text bold color={PILL_TEXT[now]} backgroundColor={COLOR[now]}>{` ${levelName(now)} `}</Text>
+              ) : (
+                <Text bold color={GRAY} backgroundColor={CARD_PILL}> Off </Text>
+              )}
             </Box>
-            <Button key="settings" label={edit ? 'Done' : 'Settings'} onPress={() => update($, editing, x => !x)} />
+            <Box flexDirection="row">
+              <Button key="power" label={isOn ? 'Turn off' : 'Turn on'} onPress={() => { shown = ''; return power($, !isOn) }} />
+              <Button key="settings" label={edit ? 'Done' : 'Settings'} onPress={() => update($, editing, x => !x)} />
+            </Box>
           </Box>
-          <Text dimColor>{edit ? SETTINGS_EXPLAIN : EXPLAIN}</Text>
+          <Text dimColor>{edit ? SETTINGS_EXPLAIN : isOn ? EXPLAIN : OFF_EXPLAIN}</Text>
         </Box>
         {edit ? settings : null}
         {edit ? null : RAISED.map(l => (
@@ -373,7 +390,8 @@ export const register: Register = on => {
       }
     }
     // Over half the week's limit, a native subagent is flagged as not preferred; never blocked.
-    if (SUBAGENT_TOOLS.has(e.tool)) {
+    // Off adds nothing at all (operator 2026-10-16: "how to turn on and off effort?"), this note included.
+    if (SUBAGENT_TOOLS.has(e.tool) && (await read($, enabled))) {
       const flag = subagentFlag((await $.session.usage().catch(() => undefined))?.rateLimits ?? [])
       if (flag !== undefined) extra.push(flag)
     }
