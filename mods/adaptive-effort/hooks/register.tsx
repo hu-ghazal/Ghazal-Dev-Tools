@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, subagentFlag, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SUBAGENT_TOOLS, SPLIT_RULE, parseSplitAnswer, splitGate, splitText } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SPLIT_RULE, parseSplitAnswer, splitGate, splitText } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -40,7 +40,7 @@ const PANE = 'adaptive-effort'
 const PANE_TITLE = 'Thinking effort'
 const STORE_THRESHOLDS = 'thresholds'
 const STORE_DEFINITIONS = 'definitions'
-// On or off, kept for new sessions (operator 2026-10-16: "how to turn on and off effort?").
+// On or off, kept for new sessions.
 const STORE_ENABLED = 'enabled'
 const STORE_SPLIT = 'split'
 const TITLE: Record<Raised, string> = { max: 'Max', xhigh: 'Extra high', high: 'High' }
@@ -99,7 +99,7 @@ async function saveChart($: EngineInterface, log: ChartLog, id?: string) {
   if (key !== undefined && log.buckets.length > 0) await $.store.set(STORE_CHART + key, log).catch(() => undefined)
 }
 
-// Operator 2026-10-16: "instead write 4 words general definition": one short line per level card.
+// One short line per level card: a four-word general definition.
 const SUMMARY: Record<Raised | 'medium', string> = {
   max: 'Hard-to-undo or unexplained problems',
   xhigh: 'Repeated or surprising failures',
@@ -202,16 +202,14 @@ export const register: Register = on => {
         `spending ${fmt(b.burn * 24)}% a day (${b.basis === 'recent' ? 'recent readings' : 'the week so far'}). ` +
         (b.h >= 1
           ? 'Within budget.'
-          : `Over budget: it pays ${Math.round(b.h * 100)}% of the spend, so every count is one higher; the effort sent is never lowered.`)
+          : `Over budget: it pays ${Math.round(b.h * 100)}% of the spend, so every count is one higher and the higher levels need more reason; an answer Claude gave is never cut down.`)
     const capped = h.max.capped ? ` Max ran ${MAX_HOLD_MS / 60_000} minutes and is held at medium until a new prompt.` : ''
-    const flag = subagentFlag((await $.session.usage().catch(() => undefined))?.rateLimits ?? [])
     return {
       text:
         `version ${manifest.version} is ${(await read($, enabled)) ? 'on' : 'off'}; last applied effort: ${await read($, level)}.\n` +
         `${answer}\nThresholds in force (saved default: ${describe(await read($, saved))}):\n${rules}\n` +
         `Limits: a change waits until the current effort has stood ${MIN_DWELL_MS / 1000} s; max runs at most ${MAX_HOLD_MS / 60_000} minutes in a row.${capped}\n` +
-        week +
-        (flag ? `\nSubagents: ${flag}` : ''),
+        week,
     }
   })
 
@@ -426,12 +424,6 @@ export const register: Register = on => {
         const line = rulesLine(t, await budget($, await $.clock.now(), false), undefined, d)
         extra.push(`The rules changed. ${line} Answer EFFORT again by these rules.`)
       }
-    }
-    // Over half the week's limit, a native subagent is flagged as not preferred; never blocked.
-    // Off adds nothing at all (operator 2026-10-16: "how to turn on and off effort?"), this note included.
-    if (SUBAGENT_TOOLS.has(e.tool) && (await read($, enabled))) {
-      const flag = subagentFlag((await $.session.usage().catch(() => undefined))?.rateLimits ?? [])
-      if (flag !== undefined) extra.push(flag)
     }
     return extra.length === 0 ? r : { ...r, context: [...(r.context ?? []), ...extra] }
   })

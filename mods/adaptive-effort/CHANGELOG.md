@@ -3,6 +3,15 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.3.1 (2026-10-16)
+
+Leaner: the mod keeps to effort.
+
+- The subagent note is gone: the mod no longer comments on subagent calls or suggests other models or workers.
+- The rules line beside the prompt names no helpers.
+- The status explains the budget step plainly: over budget the higher levels need more reason; an answer Claude gave
+  is never cut down.
+
 ## 1.3.0 (2026-10-16)
 
 An experimental option: break to simple.

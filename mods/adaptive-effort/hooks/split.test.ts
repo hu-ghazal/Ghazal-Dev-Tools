@@ -2,9 +2,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 
 import { parseSplitAnswer, splitGate } from './classify'
 
-// Operator 2026-10-16: "we can add this as an option in setting default unchecked experimental. Claude decide by score
-// x/10 the multiply by risk 0.9 the if final score > 0.7 then it pass" and "claude is blindly scoring out of ten! then
-// the calculation x 0.9 is the gate to go".
+// Break to simple (experimental): an unchecked Settings option. Claude scores out of ten without deliberating; the gate
+// is fixed arithmetic, score/10 x 0.9 over 0.7.
 
 const OPUS = 'claude-opus-5-5'
 const PANE = { component: 'Pane', requestId: 'adaptive-effort', props: { title: 'Thinking effort' }, viewport: { columns: 60, rows: 20 } } as any
