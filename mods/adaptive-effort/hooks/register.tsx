@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { EffortLevel, Hold, PaceLog } from '../types'
+import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
 import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, dwell, isStandard, levelName, levelRules, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, subagentFlag, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SUBAGENT_TOOLS } from './classify'
 import type { Raised, Thresholds } from './classify'
+import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
 
 // adaptive-effort: Claude decides its own reasoning effort. Beside each prompt the mod puts the effort rules and asks
@@ -21,6 +22,8 @@ const paceLog = atom({ plugin: 'adaptive-effort', key: 'pace' } as const, { samp
 // The user's thresholds (per level, easier -2 .. harder +3) and the saved default new sessions start from.
 const thresholds = atom({ plugin: 'adaptive-effort', key: 'thresholds' } as const, STANDARD as Thresholds)
 const saved = atom({ plugin: 'adaptive-effort', key: 'saved' } as const, STANDARD as Thresholds)
+// This session's calls and their output tokens per 15 minutes, for the pane's chart; saved in $.store for a restart.
+const chart = atom({ plugin: 'adaptive-effort', key: 'chart' } as const, EMPTY_CHART)
 
 const PANE = 'adaptive-effort'
 const PANE_TITLE = 'Thinking effort'
@@ -49,6 +52,12 @@ async function resetThresholds($: EngineInterface) {
   await update($, saved, () => STANDARD)
 }
 
+/** Saves this session's chart in the plugin's store, so an app restart finds it ($.store, a JSON file of its own). */
+async function saveChart($: EngineInterface, log: ChartLog, id?: string) {
+  const key = id ?? (await $.session.id().catch(() => undefined))
+  if (key !== undefined && log.buckets.length > 0) await $.store.set(STORE_CHART + key, log).catch(() => undefined)
+}
+
 const describe = (t: Thresholds) => RAISED.map(l => `${l} ${difficultyWord(t[l])}`).join(', ')
 const fmt = (n: number) => (Math.round(n * 10) / 10).toString()
 const mins = (ms: number) => Math.round(ms / 60_000)
@@ -59,6 +68,8 @@ export const register: Register = on => {
   let fresh = false
   // The thresholds Claude last read; a change during a turn reaches Claude on the next tool result.
   let delivered: Thresholds = STANDARD
+  // When this session's chart was last saved; saved at most once a minute and at the end, so it costs little.
+  let savedAt = 0
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -70,8 +81,26 @@ export const register: Register = on => {
     await update($, saved, () => s)
     await update($, thresholds, () => s)
     delivered = s
+    // The chart this session saved before an app restart, and the saved charts that are spent, deleted.
+    const now = await $.clock.now()
+    const id = await $.session.id().catch(() => undefined)
+    const back = id === undefined ? undefined : restored(await $.store.get(STORE_CHART + id).catch(() => undefined), now)
+    // A plugin reload runs this too, with the chart in memory ahead of the save: merged, never replaced.
+    if (back !== undefined && back.buckets.length > 0) await update($, chart, l => merged(l, back))
+    // Keys this build does not own go too: only the thresholds and the charts are its own.
+    const all: [string, unknown][] = []
+    for (const k of await $.store.keys().catch(() => [] as string[])) {
+      all.push([k, k.startsWith(STORE_CHART) ? await $.store.get(k).catch(() => undefined) : undefined])
+    }
+    for (const k of stale(all, now, [STORE_THRESHOLDS])) await $.store.delete(k).catch(() => undefined)
     // A session with nothing that draws a pane refuses the open; the controls still work through the command.
     void $.ui.open({ id: PANE, title: PANE_TITLE }).catch(() => undefined)
+    return next(e)
+  })
+
+  // The chart is saved once more as the session ends, so a restart finds its last minute too.
+  on('session.end', async ($, e, next) => {
+    await saveChart($, await read($, chart), e.sessionId)
     return next(e)
   })
 
@@ -131,43 +160,95 @@ export const register: Register = on => {
     }
   })
 
-  // The controls: Auto decides; per level, the user sets how hard that level is to reach. One
-  // block per level, each condition on its own line. Box, Text and Button only, which every surface draws.
+  // How the pane says Auto works: a press changes the conditions, and the effort follows when Claude answers by them.
+  const EXPLAIN = 'Claude picks the first level whose conditions match the work. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
+  // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
+  const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
+  const WARN = '#E8A33D'
+  // The level cards' name pills in dark blue; the Effort now pill keeps its level's colour.
+  const CARD_PILL = '#042C53'
+  // Grey, not white, for the pane's text: easier on the eye.
+  const GRAY = '#B4B2AC'
+
+  // The controls: Auto decides; per level, the user sets how hard that level is to reach. One card per level, each
+  // condition on its own line. Below them the chart of this session's output tokens and a table of the levels used.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const els = $.ui.resolve(e)
+    const { Box, Text, Button } = els
     const t = await read($, thresholds)
     const s = await read($, saved)
     const now = await read($, level)
-    const b = await budget($, await $.clock.now(), false)
+    const at = await $.clock.now()
+    const b = await budget($, at, false)
     const over = overBudget(b)
     const r = levelRules(countsIn(t, over))
+    const v = chartView(await read($, chart), at)
+    // The chart drawn in a frame of fixed size where the surface draws Svg; the terminal gets text rows.
+    const drawn =
+      e.surface !== 'terminal' && 'Svg' in els ? (
+        <els.Svg key="chart" source={chartSvg(v, clockLabel)} alt={chartAlt(v, clockLabel)} width={SVG_W} height={SVG_H} />
+      ) : (
+        textRows(v, clockLabel).map((row, i) => <Text key={`row-${i}`} color={GRAY}>{row}</Text>)
+      )
     return (
-      <Box flexDirection="column">
-        <Text bold>{`Effort now: ${levelName(now)}`}</Text>
-        <Text dimColor>Auto: Claude picks the first level whose conditions match the work.</Text>
+      <Box flexDirection="column" gap={1}>
+        <Box flexDirection="column">
+          <Box flexDirection="row" alignItems="center" gap={1}>
+            <Text bold color={GRAY}>Effort now</Text>
+            <Text bold color={PILL_TEXT[now]} backgroundColor={COLOR[now]}>{` ${levelName(now)} `}</Text>
+          </Box>
+          <Text dimColor>{EXPLAIN}</Text>
+        </Box>
         {RAISED.map(l => (
-          <Box key={`level-${l}`} flexDirection="column">
-            <Text> </Text>
-            <Box flexDirection="row">
-              <Text bold>{`${TITLE[l]} when   `}</Text>
-              <Button key={`${l}-easier`} label="Easier" onPress={() => update($, thresholds, x => stepped(x, l, -1))} />
-              <Button key={`${l}-harder`} label="Harder" onPress={() => update($, thresholds, x => stepped(x, l, 1))} />
-              <Text dimColor>{`   ${difficultyWord(t[l])}`}</Text>
+          <Box key={`level-${l}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+            <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+              <Box flexDirection="row" alignItems="center" gap={1}>
+                <Text bold color={GRAY} backgroundColor={CARD_PILL}>{` ${TITLE[l]} `}</Text>
+                <Text dimColor>{difficultyWord(t[l])}</Text>
+              </Box>
+              <Box flexDirection="row">
+                <Button key={`${l}-easier`} label="Easier" onPress={() => update($, thresholds, x => stepped(x, l, -1))} />
+                <Button key={`${l}-harder`} label="Harder" onPress={() => update($, thresholds, x => stepped(x, l, 1))} />
+              </Box>
             </Box>
             {r[l].map((c, i) => (
-              <Text key={`${l}-c${i}`}>{`  • ${c}`}</Text>
+              <Text key={`${l}-c${i}`} dimColor>{`• ${c}`}</Text>
             ))}
           </Box>
         ))}
-        <Text> </Text>
-        <Text bold>Medium otherwise</Text>
-        {over ? <Text dimColor>{`Weekly usage over budget (${b?.used}% used): every count above is one higher than set.`}</Text> : <Text> </Text>}
-        <Text> </Text>
-        <Box flexDirection="row">
-          <Button key="save" label="Save as default" hotkey="s" onPress={() => saveThresholds($)} />
-          <Button key="reset" label="Reset to standard" hotkey="r" onPress={() => resetThresholds($)} />
+        <Box flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
+          <Text bold color={GRAY} backgroundColor={CARD_PILL}> Medium </Text>
+          <Text dimColor>everything else</Text>
         </Box>
-        <Text dimColor>{`Default for new sessions: ${isStandard(s) ? 'standard' : describe(s)}${sameThresholds(t, s) ? '' : ' (current settings not saved)'}`}</Text>
+        {over ? <Text color={WARN}>{`⚠ Weekly usage ${b?.used}%, over budget: every count above is one higher than set.`}</Text> : null}
+        <Box flexDirection="column">
+          <Box flexDirection="row" gap={1}>
+            <Button key="save" label="Save as default" hotkey="s" variant="primary" onPress={() => saveThresholds($)} />
+            <Button key="reset" label="Reset to standard" hotkey="r" onPress={() => resetThresholds($)} />
+          </Box>
+          <Text dimColor>{`Default for new sessions: ${isStandard(s) ? 'standard' : describe(s)}${sameThresholds(t, s) ? '' : ' (current settings not saved)'}`}</Text>
+        </Box>
+        <Text bold color={GRAY}>{chartTitle(v)}</Text>
+        {v.bars.length === 0 ? (
+          <Text dimColor>No model calls yet since this build loaded.</Text>
+        ) : (
+          <Box flexDirection="column">
+            <Box flexDirection="column" marginBottom={1}>
+              {[TABLE_HEAD, ...levelRows(v)].map((row, i) => (
+                <Box key={`row-${row.level}`} flexDirection="row">
+                  <Box width={14} flexDirection="row">
+                    {i === 0 ? <Text dimColor>{row.level}</Text> : <Text color={COLOR[row.level as EffortLevel]}>■</Text>}
+                    {i === 0 ? null : <Text color={GRAY}>{` ${LEVEL_TITLE[row.level as EffortLevel]}`}</Text>}
+                  </Box>
+                  <Box width={9}><Text dimColor={i === 0} color={i === 0 ? undefined : GRAY}>{row.calls}</Text></Box>
+                  <Box width={10}><Text dimColor={i === 0} color={i === 0 ? undefined : GRAY}>{row.each}</Text></Box>
+                  <Box width={10}><Text dimColor={i === 0} color={i === 0 ? undefined : GRAY}>{row.share}</Text></Box>
+                </Box>
+              ))}
+            </Box>
+            {drawn}
+          </Box>
+        )}
       </Box>
     )
   })
@@ -245,6 +326,13 @@ export const register: Register = on => {
       shown = status
       $.ui.status(status)
     }
-    return yield* next({ ...e, effort })
+    // The chart records the call once its response is in, with the output tokens it spent: one write per call.
+    const r = yield* next({ ...e, effort })
+    const log = await update($, chart, l => recordStep(l, effort, now, r?.usage?.output_tokens ?? 0))
+    if (now - savedAt >= SAVE_EVERY_MS) {
+      savedAt = now
+      await saveChart($, log)
+    }
+    return r
   })
 }

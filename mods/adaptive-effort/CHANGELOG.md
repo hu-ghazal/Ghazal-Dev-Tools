@@ -3,6 +3,18 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.0.2 (2026-10-16)
+
+Watch your usage live in the pane.
+
+- A chart of output tokens per 15 minutes, stacked by effort level, in a frame of fixed size that fits 24 hours.
+- A table of the levels used: calls, output per call and share of all output.
+- Each session's chart is kept for 24 hours in local plugin storage, saved at most once a minute and at session end,
+  so it comes back after an app restart; a plugin reload keeps every call. Older charts are deleted.
+- The pane is easier to read: the effort as a coloured pill, one card per level, grey text and the budget warning in
+  amber.
+- Tests: the chart's buckets, deletion, table, frame and drawing, and the restart and reload paths.
+
 ## 1.0.1 (2026-10-16)
 
 Fixes to the 10-minute max limit.

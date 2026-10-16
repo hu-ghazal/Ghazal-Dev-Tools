@@ -21,7 +21,9 @@ function harness(on: any): Seen {
   on('tool.call', () => ({ result: { stdout: 'ok', stderr: '', interrupted: false } }))
   on('turn.step', async function* ($: any, e: any) {
     seen.efforts.push(e.effort)
-    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: null }
+    // Step i spends (i + 1) thousand output tokens.
+    const usage = { input_tokens: 2, output_tokens: 1000 * (e.index + 1), cache_creation_input_tokens: 0, cache_read_input_tokens: 200_000, model: OPUS }
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage }
   })
   return seen
 }
@@ -57,10 +59,12 @@ describe('controls', () => {
       for (const l of ['max', 'xhigh', 'high']) {
         expect([await ui.find({ type: 'Button', key: `${l}-easier` }), await ui.find({ type: 'Button', key: `${l}-harder` })].every(x => x !== undefined), `pane.test.ts:${surface}:${l}-buttons`).toBe(true)
       }
-      expect(await ui.find({ type: 'Text', text: /^  • a failure still unexplained after 2 attempts$/ }), `pane.test.ts:${surface}:max-line`).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^• a failure still unexplained after 2 attempts$/ }), `pane.test.ts:${surface}:max-line`).toBeDefined()
+      // The pane says what a press changes: the conditions, and the effort follows Claude's next answer.
+      expect(await ui.find({ type: 'Text', text: /^Claude picks the first level whose conditions match the work\. Easier or Harder changes the conditions; the effort follows Claude's next answer\.$/ }), `pane.test.ts:${surface}:explain`).toBeDefined()
       expect([await ui.find({ type: 'Text', text: /sooner|later/i }), await ui.find({ type: 'Svg' }), await ui.find({ type: 'Client' })], `pane.test.ts:${surface}:no-timing-no-graphic`).toEqual([undefined, undefined, undefined])
       await ui.press({ key: 'max-harder' })
-      expect(await ui.find({ type: 'Text', text: /^  • a failure still unexplained after 3 attempts$/ }), `pane.test.ts:${surface}:max-harder`).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^• a failure still unexplained after 3 attempts$/ }), `pane.test.ts:${surface}:max-harder`).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /\(current settings not saved\)/ }), `pane.test.ts:${surface}:unsaved`).toBeDefined()
       await ui.press({ key: 'save' })
       expect(await ui.find({ type: 'Text', text: /^Default for new sessions: max harder \+1, xhigh standard, high standard$/ }), `pane.test.ts:${surface}:saved`).toBeDefined()
@@ -78,6 +82,85 @@ describe('controls', () => {
     await step($, 1)
     expect(seen.efforts, 'pane.test.ts:auto-follows-answer').toEqual(['medium', 'max'])
     expect(seen.modelCalls, 'pane.test.ts:no-model-call').toBe(0)
+  })
+
+  test('the pane ends with the chart: a table of the levels used and drawn columns, updating as steps happen', async ($, on) => {
+    const clock = mock.clock(on)
+    mock.store(on)
+    harness(on)
+    await start($)
+    const open: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    expect(await open.find({ type: 'Text', text: /^No model calls yet since this build loaded\.$/ }), 'pane.test.ts:chart-empty').toBeDefined()
+    await $.turn.start({ turnId: 't1', text: 'next' })
+    await step($, 0)
+    await $.tool.call({ tool: 'Bash', command: ANSWER('max') })
+    await clock.advance(60_000)
+    await step($, 1)
+    await step($, 2)
+    // The pane already open draws the steps without being opened again.
+    const live: any = await open.find({ type: 'Svg' })
+    expect(typeof live?.props?.source === 'string' && (live.props.source as string).includes('#042C53'), 'pane.test.ts:chart-live').toBe(true)
+    await open.unmount()
+    for (const surface of ['terminal', 'desktop', 'mobile'] as const) {
+      const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface, ...PANE })
+      expect(await ui.find({ type: 'Text', text: /^Output tokens per 15 minutes, by effort$/ }), `pane.test.ts:${surface}:chart-title`).toBeDefined()
+      // One medium call of 1k and two max calls of 2k and 3k output tokens.
+      // One row per level used: name, calls, output per call, share of output.
+      for (const [key, text] of [['row-level', 'EffortCallsPer callOf output'], ['row-medium', '■ Medium11.0k17%'], ['row-max', '■ Max22.5k83%']]) {
+        expect((await ui.find({ key: key.replace('level', 'Effort') }))?.text, `pane.test.ts:${surface}:${key}`).toBe(text)
+      }
+      // Only the levels used are listed; no line about levels not used.
+      expect(await ui.find({ type: 'Text', text: /max run/i }), `pane.test.ts:${surface}:no-max-run`).toBeUndefined()
+      const svg: any = await ui.find({ type: 'Svg' })
+      if (surface === 'terminal') {
+        // No Svg on the terminal: 1k medium and 5k max tokens, the column 20 marks wide, 3 medium and 17 max.
+        expect([svg, await ui.find({ type: 'Text', text: /^[0-9]{2}:[0-9]{2} ░{3}█{17} +6\.0k$/ }) !== undefined], `pane.test.ts:${surface}:rows`).toEqual([undefined, true])
+      } else {
+        expect(/^Effort chart: output tokens per 15 minutes from [0-9]{2}:[0-9]{2} to [0-9]{2}:[0-9]{2}; medium 1\.0k, high 0, extra high 0, max 5\.0k\.$/.test(svg?.props?.alt ?? ''), `pane.test.ts:${surface}:svg`).toBe(true)
+        // A fixed frame: the drawing never grows with the pane or the data.
+        expect([svg?.props?.width, svg?.props?.height], `pane.test.ts:${surface}:fixed-frame`).toEqual([340, 190])
+      }
+      expect(await ui.find({ type: 'Client' }), `pane.test.ts:${surface}:no-client`).toBeUndefined()
+      expect([await ui.find({ text: /not followed|answers from claude/i }), await ui.find({ type: 'Text', text: /^Effort changes$/ })], `pane.test.ts:${surface}:no-endless-counts`).toEqual([undefined, undefined])
+      await ui.unmount()
+    }
+  })
+
+  test('after an app restart the chart comes back from the store; saved charts older than 24 hours are deleted', async ($, on) => {
+    const now = 100 * 3_600_000
+    const clock = mock.clock(on, { now })
+    // The plugin's store as the app keeps it across a restart, in a map the test can read.
+    const mem = new Map<string, unknown>([
+      ['chart:S1', { buckets: [{ at: now, n: [2, 0, 0, 0], tok: [3_000, 0, 0, 0], nt: [2, 0, 0, 0], ct: [3_000, 0, 0, 0] }], last: 'medium' }],
+      ['chart:OLD', { buckets: [{ at: now - 30 * 3_600_000, n: [1, 0, 0, 0], tok: [1_000, 0, 0, 0] }] }],
+      ['chart:BAD', 'not a chart'],
+      ['thresholds', { max: 1, xhigh: 0, high: 0 }],
+      ['unknown-key', [1]],
+    ])
+    on('store.get', ($: any, e: any) => ({ value: mem.get(e.key) }))
+    on('store.set', ($: any, e: any) => { mem.set(e.key, JSON.parse(JSON.stringify(e.value))); return { value: undefined } })
+    on('store.delete', ($: any, e: any) => { mem.delete(e.key); return { value: undefined } })
+    on('store.keys', () => ({ value: [...mem.keys()] }))
+    const $store = { get: async (k: string) => mem.get(k) }
+    harness(on)
+    on('session.id', () => ({ value: 'S1' }))
+    await start($)
+    expect([...mem.keys()].sort(), 'pane.test.ts:old-deleted').toEqual(['chart:S1', 'thresholds'])
+    const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    expect((await ui.find({ key: 'row-medium' }))?.text, 'pane.test.ts:restored').toBe('■ Medium21.5k100%')
+    await ui.unmount()
+    // Saved at most once a minute: the first call saves, one 10 s later does not, one a minute later does.
+    await $.turn.start({ turnId: 't1', text: 'next' })
+    await step($, 0)
+    const first = JSON.stringify(await $store.get('chart:S1'))
+    await clock.advance(10_000)
+    await step($, 1)
+    expect(JSON.stringify(await $store.get('chart:S1')), 'pane.test.ts:not-every-call').toBe(first)
+    await clock.advance(60_000)
+    await step($, 2)
+    const saved: any = await $store.get('chart:S1')
+    const medium = saved.buckets.reduce((a: number, b: any) => a + b.tok[0], 0)
+    expect(medium, 'pane.test.ts:saved-a-minute-later').toBe(3_000 + 1_000 + 2_000 + 3_000)
   })
 
   test('/adaptive-effort pane raises the pane with focus and says whether it is shown or behind another pane', async ($, on) => {

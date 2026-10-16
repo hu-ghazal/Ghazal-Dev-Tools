@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.0.1" src="https://img.shields.io/badge/version-1.0.1-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.0.2" src="https://img.shields.io/badge/version-1.0.2-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -37,6 +37,7 @@ shifting smooth and the most expensive gear short.
 - ⏱️ **Smooth shifting.** At least 60 seconds between changes, so the effort never flickers.
 - 🛑 **Rev limiter on max.** Ten minutes in a row at most, then back to medium until your next prompt.
 - 💰 **Budget aware.** When your weekly usage runs ahead of the week, every gear gets one step harder to reach.
+- 👀 **Watch it live.** A chart in the pane shows the output tokens each gear spends, per 15 minutes, as you work.
 - 🔒 **Local and free.** No model calls, no network requests.
 
 ## 🧭 How it works
@@ -76,14 +77,40 @@ check you already ask Claude to echo.
 
 Opus, Fable and Sonnet 5 and later, from medium to max. Other models and subagent steps are left alone.
 
+## 🎚️ You control your usage, and watch it live
+
+Higher effort means more thinking, and more thinking means more tokens from your usage limit. adaptive-effort leaves
+that trade-off in your hands:
+
+- **You set how hard each gear is to reach.** Press **Harder** on Max, Extra high or High and Claude needs more reason
+  to use it, so it spends less; press **Easier** and it climbs sooner when the work calls for it.
+- **You see what it costs, as it happens.** The pane's chart and table update with every model call, so after a press
+  you watch the next answers follow your new setting.
+- **Your weekly limit is watched too.** When your usage runs ahead of the week, every gear gets one step harder on its
+  own, and the pane says so in amber.
+
 ## 🎛️ The Thinking effort pane
 
 The pane opens at session start (`/adaptive-effort pane` brings it to the front). It shows:
 
-- the effort now;
-- one block each for **Max**, **Extra high** and **High**, every condition on its own line with the counts in force,
+- the effort now, as a coloured pill, and one line on how Auto works;
+- one card each for **Max**, **Extra high** and **High**, every condition on its own line with the counts in force,
   and **Easier** / **Harder** buttons;
-- **Save as default** and **Reset to standard**.
+- **Save as default** and **Reset to standard**;
+- the live chart and table below.
+
+### 📊 The live chart
+
+- **Output tokens per 15 minutes, by effort.** One column per quarter hour, stacked by level, starting at the left.
+  Output tokens (thinking included) are what the effort changes; the context Claude rereads costs the same at every
+  level, so it is not counted.
+- **A frame of fixed size.** The tallest column fills the height and 24 hours fit the width, so the chart never grows.
+  The terminal gets text rows in place of the drawing.
+- **A table of the levels used**, one row each: calls, output per call and share of all output. Levels not used are left
+  out.
+- **Kept for 24 hours, then deleted.** Each session's chart is saved in Claude Code's local plugin storage at most once
+  a minute and when the session ends, so it comes back after an app restart. Older charts are deleted at the next
+  session start, so the storage stays small.
 
 Each step **Harder** raises that level's counts by one; **Easier** lowers them (from easier -2 to harder +3). Harder on
 Max also makes a design decision count for max only when it spans that many systems. A change during a turn reaches
@@ -122,12 +149,13 @@ claude plugin test path/to/adaptive-effort
 ```
 
 The tests cover answer parsing, the hold and the max limit, the budget step, the pane and its buttons, saved defaults,
-model ranges and the subagent note.
+model ranges, the subagent note, and the chart: its buckets, the 24-hour deletion, the table, the fixed frame, and
+keeping it across a restart and a plugin reload.
 
 ## 🔒 Privacy and cost
 
-The mod makes no model calls and no network requests. It reads the usage limits Claude Code already reports, and keeps
-its settings in Claude Code's local plugin storage.
+The mod makes no model calls and no network requests. It reads the usage limits and token counts Claude Code already
+reports, and keeps its settings and each session's chart (for 24 hours) in Claude Code's local plugin storage.
 
 ## 📜 License
 
