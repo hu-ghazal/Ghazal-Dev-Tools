@@ -37,7 +37,7 @@ Everyone is welcome: first-time contributors, daily agent users and tool builder
 - **Report a bug.** Say what you did, what you expected and what happened instead.
 - **Suggest an idea.** Open an issue describing the problem it solves.
 - **Send a change.** Fork the repository, make your change on a branch, add or update its tests, and open a pull
-  request that says what it changes and why.
+  request that says what it changes and why. See [CONTRIBUTING.md](CONTRIBUTING.md) for the steps and terms.
 
 Please keep tools self-contained, free of personal paths, keys and machine-specific settings, and tested before you
 send them. Be kind and constructive in issues and reviews.
@@ -56,4 +56,5 @@ This project is free for **noncommercial** use under the **PolyForm Noncommercia
 
 For commercial use, contact the copyright holder to agree a license.
 
-By sending a contribution, you agree it is shared under the same license.
+By sending a contribution, you agree to the terms in [CONTRIBUTING.md](CONTRIBUTING.md): it is shared under the same
+license, and the copyright holder may also include it under a commercial license.
