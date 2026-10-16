@@ -42,4 +42,10 @@ describe('subagent flag', () => {
     harness(on, week(77))
     expect((await spawn($, 'Read')).context, 'subagent.test.ts:45').toBe(undefined)
   })
+  test('turned off, a subagent call carries no flag even over 50%', async ($, on) => {
+    harness(on, week(77))
+    mock.store(on)
+    await $.command.run({ command: 'adaptive-effort', args: 'off', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
+    expect((await spawn($)).context, 'subagent.test.ts:off').toBe(undefined)
+  })
 })

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.1.0" src="https://img.shields.io/badge/version-1.1.0-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -43,6 +43,18 @@ shifting smooth and the most expensive gear short.
   project for what makes a mistake costly.
 - 👀 **Watch it live.** A chart in the pane shows the output tokens each gear spends, per 15 minutes, as you work.
 - 🔒 **Local and free.** No model calls, no network requests.
+
+## 🔌 Turn it on or off
+
+| To | In the pane | Or type |
+|---|---|---|
+| **Turn it off** | Press **Turn off**, beside **Settings** at the top | `/adaptive-effort off` |
+| **Turn it back on** | Press **Turn on** | `/adaptive-effort on` |
+| **See whether it is on** | The top of the pane shows the level now, or **Off** | `/adaptive-effort` |
+
+**Off** means the mod steps aside completely: Claude Code keeps the effort you set yourself, and nothing is added
+beside your prompts. **On** lets Claude choose its effort again from the next answer. Your choice is remembered, so new
+sessions start the way you left it.
 
 ## 🧠 How Claude decides its effort
 
@@ -132,7 +144,8 @@ that trade-off in your hands:
 
 The pane opens at session start (`/adaptive-effort pane` brings it to the front). It shows:
 
-- the effort now, as a coloured pill, a **Settings** button, and one line on how Auto works;
+- the effort now, as a coloured pill (or **Off**), the **Turn off** / **Turn on** button, a **Settings** button, and one
+  line on how Auto works;
 - one card each for **Max**, **Extra high** and **High**, with a short definition of the level, your setting when
   you changed it (harder +1, easier -1) and **Easier** / **Harder** buttons, then a card for **Medium**;
 - **Save as default** and **Reset to default**;
@@ -171,7 +184,7 @@ The mobile app shows the texts but has no fields to edit them yet.
 | `/adaptive-effort max harder` | Makes a level harder or easier: `max`, `xhigh` or `high`, then `harder` or `easier` |
 | `/adaptive-effort save` | Keeps the current thresholds as the default for new sessions |
 | `/adaptive-effort reset` | Returns to the default thresholds |
-| `/adaptive-effort off` / `on` | Turns the mod off or on |
+| `/adaptive-effort off` / `on` | Turns the mod off or on, now and for new sessions (the same as the pane button) |
 
 ## 📦 Install
 
@@ -201,7 +214,7 @@ adaptive-effort keeps running the build it had, or none, until you reload it.
    or start a new session.
 
 2. **Check the build.** Run `/adaptive-effort`. Its first line names the version this session loaded, for example
-   `version 1.1.0 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
+   `version 1.2.0 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
    back to step 1.
 
 3. **Open the pane.** It opens by itself when a session starts. After a reload, or when it is hidden behind another

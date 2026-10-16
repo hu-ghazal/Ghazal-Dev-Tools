@@ -3,6 +3,17 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.2.0 (2026-10-16)
+
+Turn it off and on from the pane.
+
+- A **Turn off** / **Turn on** button beside **Settings**. Off, the pane shows **Off** and says what that means: Claude
+  Code keeps its own effort and nothing is added beside your prompts.
+- Off or on is now remembered for new sessions, from the button and from `/adaptive-effort off` / `on` alike; before,
+  every new session started on.
+- The README explains how to turn it on and off, near the top.
+- Tests: the button, the choice kept for a new session, and the command turning it back on.
+
 ## 1.1.0 (2026-10-16)
 
 Claude weighs the cost before it picks a level.
