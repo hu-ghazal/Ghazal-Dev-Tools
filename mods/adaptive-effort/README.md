@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.2.0" src="https://img.shields.io/badge/version-1.2.0-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.3.0" src="https://img.shields.io/badge/version-1.3.0-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -171,9 +171,23 @@ at its next tool call.
 ### ⚙️ Settings: your own definitions
 
 **Settings** shows every condition's code and general text in a field. Edit one and press Enter: it is saved for every
-session and Claude reads it with the next prompt. Keep `{n}` where the count goes (Easier and Harder move it); `{nth}`
-writes it as 3rd, 4th. **Reset definitions to default** brings back the texts above. **Done** returns to the controls.
+session and Claude reads it with the next prompt. Write in plain words: a number in a condition is its count, so
+typing 5 instead of 4 makes it 5, and Easier, Harder and the weekly budget still move it from there. **Reset definitions to default** brings back the texts above. **Done** returns to the controls.
 The mobile app shows the texts but has no fields to edit them yet.
+
+### 🧪 Break to simple (experimental)
+
+At the top of **Settings**, unchecked by default. Checked, Claude adds a quick score out of ten whenever it answers
+Max: how well a short plan would turn the work into clear, separate pieces. The mod does the rest with plain arithmetic,
+no extra model call:
+
+| Score | Score/10 × 0.9 | Over 0.7? | Effort sent |
+|---|---|---|---|
+| 8, 9 or 10 | 0.72 to 0.9 | yes | **High** to write the plan, then **Medium** for each piece |
+| 7 or less, or no score | 0.63 or less | no | **Max**, as Claude answered |
+
+The pieces are done in the same conversation, not in subagents. The pane shows the last score and what it sent while the
+option is on. It is experimental: watch whether split work goes as well as Max before you rely on it.
 
 ## ⌨️ Commands
 
@@ -214,7 +228,7 @@ adaptive-effort keeps running the build it had, or none, until you reload it.
    or start a new session.
 
 2. **Check the build.** Run `/adaptive-effort`. Its first line names the version this session loaded, for example
-   `version 1.2.0 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
+   `version 1.3.0 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
    back to step 1.
 
 3. **Open the pane.** It opens by itself when a session starts. After a reload, or when it is hidden behind another

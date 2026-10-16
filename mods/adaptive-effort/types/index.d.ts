@@ -48,8 +48,9 @@ declare module 'claude-code' {
       thresholds: Thresholds
       saved: Thresholds
       chart: ChartLog
-      definitions: import('../hooks/classify').Definitions
+      definitions: Record<'max' | 'xhigh' | 'high' | 'medium', { count?: string; shift?: number; code: string; general: string }[]>
       editing: boolean
+      split: { on: boolean; last?: { score: number; value: number; pass: boolean; at: number } }
     }
   }
 }

@@ -278,7 +278,7 @@ export const ordinal = (n: number): string =>
 /** The counts a definition can name: `{n}` in its text, or `{nth}` as 3rd, 4th. */
 export type CountKey = 'design' | 'attempts' | 'systems' | 'failure' | 'files' | 'steps'
 /** One condition in two versions, for code work and for any other work; `count` is fixed, the texts are the user's. */
-export type Definition = { count?: CountKey; code: string; general: string }
+export type Definition = { count?: CountKey; shift?: number; code: string; general: string }
 export type DefinedLevel = Raised | 'medium'
 export const DEFINED: readonly DefinedLevel[] = ['max', 'xhigh', 'high', 'medium']
 export type Definitions = Record<DefinedLevel, Definition[]>
@@ -339,18 +339,47 @@ export function validDefinitions(v: unknown): Definitions | undefined {
       const d = list[i] as Record<string, unknown> | null
       const ok = (x: unknown): x is string => typeof x === 'string' && x.trim().length > 0 && x.length <= DEFINITION_MAX
       if (typeof d !== 'object' || d === null || !ok(d.code) || !ok(d.general)) return undefined
-      out[l].push({ ...DEFAULT_DEFINITIONS[l][i], code: d.code.trim(), general: d.general.trim() })
+      const shift = d.shift === undefined ? 0 : d.shift
+      if (typeof shift !== 'number' || !Number.isInteger(shift) || Math.abs(shift) > SHIFT_MAX) return undefined
+      out[l].push({ ...DEFAULT_DEFINITIONS[l][i], ...(shift ? { shift } : {}), code: d.code.trim(), general: d.general.trim() })
     }
   }
   return out
 }
 export const sameDefinitions = (a: Definitions, b: Definitions): boolean =>
-  DEFINED.every(l => a[l].every((d, i) => d.code === b[l][i]?.code && d.general === b[l][i]?.general))
-/** One definition text changed; the others stay. */
-export function withDefinition(d: Definitions, l: DefinedLevel, i: number, side: 'code' | 'general', text: string): Definitions {
-  const t = text.trim()
-  if (t.length === 0 || t.length > DEFINITION_MAX || d[l][i] === undefined) return d
-  return { ...d, [l]: d[l].map((x, j) => (j === i ? { ...x, [side]: t } : x)) }
+  DEFINED.every(l => a[l].every((d, i) => d.code === b[l][i]?.code && d.general === b[l][i]?.general && (d.shift ?? 0) === (b[l][i]?.shift ?? 0)))
+
+/** The furthest a typed number moves one condition's count from its level's count. */
+export const SHIFT_MAX = 20
+/** A condition's count in force: its level's count, moved by the number the user typed, never below 1. */
+export function countOf(c: Counts, x: Definition): number | undefined {
+  if (x.count === undefined) return undefined
+  const base = x.count === 'design' ? (c.design ?? 2) : c[x.count]
+  return Math.max(1, base + (x.shift ?? 0))
+}
+/** A field shows the text as Claude reads it, with its number: the user writes plain words, never a placeholder. */
+export const editText = (c: Counts, x: Definition, side: 'code' | 'general'): string => fill(x[side], countOf(c, x))
+// The first standalone whole number, or ordinal, the user wrote: not inside a word or a longer number (v2, 1.5, 1234).
+const COUNT_IN_TEXT = /(?<![\w.])(\d{1,3})(st|nd|rd|th)?(?!\w|\.\d)/
+
+/**
+ * One definition text changed; the others stay. Given the counts in force, the first number in a counted condition's
+ * text is its count: a number other than the one shown moves that condition's count, and Easier, Harder and the
+ * weekly budget still move it from there. Without counts the text is kept as written.
+ */
+export function withDefinition(d: Definitions, l: DefinedLevel, i: number, side: 'code' | 'general', text: string, c?: Counts): Definitions {
+  let t = text.trim()
+  const x = d[l][i]
+  if (t.length === 0 || t.length > DEFINITION_MAX || x === undefined) return d
+  let shift = x.shift ?? 0
+  const shown = c === undefined ? undefined : countOf(c, x)
+  const m = shown === undefined ? null : COUNT_IN_TEXT.exec(t)
+  if (m && shown !== undefined) {
+    shift = Math.max(-SHIFT_MAX, Math.min(SHIFT_MAX, shift + Number(m[1]) - shown))
+    t = t.slice(0, m.index) + (m[2] ? '{nth}' : '{n}') + t.slice(m.index + m[0].length)
+  }
+  const { shift: _old, ...rest } = x
+  return { ...d, [l]: d[l].map((y, j) => (j === i ? { ...rest, ...(shift ? { shift } : {}), [side]: t } : y)) }
 }
 
 /** One condition with its count filled in. */
@@ -363,9 +392,8 @@ const fill = (text: string, n: number | undefined) =>
 
 /** Each level's conditions with the counts in force. A design decision needs 2 places until Harder on max raises it. */
 export function levelRules(c: Counts, d: Definitions = DEFAULT_DEFINITIONS): Record<DefinedLevel, Rule[]> {
-  const count = (k: CountKey | undefined) => (k === undefined ? undefined : k === 'design' ? (c.design ?? 2) : c[k])
   const rules = {} as Record<DefinedLevel, Rule[]>
-  for (const l of DEFINED) rules[l] = d[l].map(x => ({ code: fill(x.code, count(x.count)), general: fill(x.general, count(x.count)) }))
+  for (const l of DEFINED) rules[l] = d[l].map(x => ({ code: fill(x.code, countOf(c, x)), general: fill(x.general, countOf(c, x)) }))
   return rules
 }
 
@@ -436,3 +464,42 @@ export function rulesLine(
     (over ? ' Over budget, prefer lighter helpers over native subagents.' : '')
   )
 }
+
+/**
+ * Experimental split before Max, off by default. Claude adds a quick score out of ten to an answer of max, SPLIT=<0-10>:
+ * how well a short plan would turn the work into clear pieces. The gate is plain arithmetic: SPLIT/10 x 0.9 over 0.7
+ * passes, and the step is then sent at High to write the plan, the pieces after it at Medium. No model call.
+ */
+export const SPLIT_FACTOR = 0.9
+export const SPLIT_PASS = 0.7
+
+/** The last SPLIT=<0-10> on the first line of an echo; anything else (11, 8.5, 08, -1, XSPLIT=) is no score. */
+export function parseSplitAnswer(command: unknown): number | undefined {
+  if (typeof command !== 'string') return undefined
+  const s = command.trimStart()
+  if (!/^echo\s/.test(s)) return undefined
+  let found: number | undefined
+  for (const raw of (s.split('\n')[0] ?? '').slice(4).trim().split(/\s+/)) {
+    let tok = raw.replace(/^["']+/, '')
+    while (tok && '.,;"\''.includes(tok.charAt(tok.length - 1))) tok = tok.slice(0, -1)
+    const eq = tok.indexOf('=')
+    if (eq <= 0 || tok.slice(0, eq).toUpperCase() !== 'SPLIT') continue
+    const v = tok.slice(eq + 1)
+    found = /^(?:10|[0-9])$/.test(v) ? Number(v) : undefined
+  }
+  return found
+}
+
+/** The gate: SPLIT/10 x 0.9, rounded to two places, passes over 0.7 (8 gives 0.72 and passes, 7 gives 0.63). */
+export function splitGate(score: number): { value: number; pass: boolean } {
+  const value = Math.round((score / 10) * SPLIT_FACTOR * 100) / 100
+  return { value, pass: value > SPLIT_PASS }
+}
+
+export const splitText = (score: number) => {
+  const g = splitGate(score)
+  return `split ${score}/10 x ${SPLIT_FACTOR} = ${g.value} ${g.pass ? '>' : 'not over'} ${SPLIT_PASS}`
+}
+
+export const SPLIT_RULE =
+  'adaptive-effort experimental split (on): when you answer EFFORT=max, add a quick score out of ten in the same echo, SPLIT=<0-10>: how well a short plan would turn the work into clear, separate pieces (10: clearly separable, 0: one judgment that cannot be split). Do not deliberate over it. adaptive-effort computes SPLIT/10 x 0.9; over 0.7 the step runs at High to write the plan, then answer EFFORT=medium for each piece, done in this conversation, not in subagents. Not over 0.7, or no SPLIT, Max stands.'

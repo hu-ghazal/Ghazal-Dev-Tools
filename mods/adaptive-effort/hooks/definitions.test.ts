@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { DEFAULT_DEFINITIONS, DEFINED, STANDARD, countsIn, levelRules, ruleText, stepped, rulesLine, validDefinitions, weeklyBudget, withDefinition } from './classify'
+import { DEFAULT_DEFINITIONS, DEFINED, STANDARD, countsIn, editText, levelRules, ruleText, stepped, rulesLine, validDefinitions, weeklyBudget, withDefinition } from './classify'
 
 // Each condition in a code and a general version, with the counts in force; the user's own texts, saved and read back.
 
@@ -74,6 +74,26 @@ describe('definitions', () => {
   test('R9 a user text keeps a $ as written, and {n} and {nth} take the count', () => {
     const d = withDefinition(DEFAULT_DEFINITIONS, 'xhigh', 0, 'code', "costs $& or $' after {n} runs, the {nth} time")
     expect(levelRules(countsIn(STANDARD, false), d).xhigh[0].code, 'definitions.test.ts:R9').toBe("costs $& or $' after 3 runs, the 3rd time")
+  })
+
+  // The fields read as plain words; no placeholder reaches the user.
+  test('R11 fields show plain text with the number; a typed number is the count of that condition, and Harder still moves it', () => {
+    const c = countsIn(STANDARD, false)
+    const shown = DEFINED.flatMap(l => DEFAULT_DEFINITIONS[l].flatMap(x => [editText(c, x, 'code'), editText(c, x, 'general')]))
+    expect(shown.filter(x => /[{}]/.test(x)), 'definitions.test.ts:R11-plain').toEqual([])
+    expect(editText(c, DEFAULT_DEFINITIONS.high[0], 'code'), 'definitions.test.ts:R11-shown').toBe('3 or more files that must stay consistent')
+    const d = withDefinition(DEFAULT_DEFINITIONS, 'high', 0, 'code', '5 or more source files changed together', c)
+    const r = levelRules(c, d).high[0]
+    expect([r.code, r.general, editText(c, d.high[0], 'general')], 'definitions.test.ts:R11-typed').toEqual(['5 or more source files changed together', '5 or more pieces that must agree with each other', '5 or more pieces that must agree with each other'])
+    expect(levelRules(countsIn(stepped(STANDARD, 'high', 1), true), d).high[0].code, 'definitions.test.ts:R11-harder').toBe('7 or more source files changed together')
+    const o = withDefinition(DEFAULT_DEFINITIONS, 'xhigh', 0, 'code', 'the same check fails a 5th time.', c)
+    expect([o.xhigh[0].code, levelRules(c, o).xhigh[0].code], 'definitions.test.ts:R11-ordinal').toEqual(['the same check fails a {nth} time.', 'the same check fails a 5th time.'])
+    // Numbers inside a word or a longer number are never the count; a $ stays as written.
+    const a = withDefinition(DEFAULT_DEFINITIONS, 'high', 0, 'code', "v2 API, 1.5x, 1234 lines, $& then 4 files", c)
+    expect([a.high[0].code, levelRules(c, a).high[0].code], 'definitions.test.ts:R11-boundaries').toEqual(['v2 API, 1.5x, 1234 lines, $& then {n} files', "v2 API, 1.5x, 1234 lines, $& then 4 files"])
+    const n = withDefinition(DEFAULT_DEFINITIONS, 'high', 0, 'code', 'files that must stay consistent', c)
+    expect([n.high[0].code, levelRules(c, n).high[0].general], 'definitions.test.ts:R11-no-number').toEqual(['files that must stay consistent', '3 or more pieces that must agree with each other'])
+    expect(validDefinitions(JSON.parse(JSON.stringify(d)))?.high[0].shift, 'definitions.test.ts:R11-saved').toBe(2)
   })
 
   test('R10 own definitions are named in the line and used in it', () => {
