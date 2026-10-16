@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.3.0" src="https://img.shields.io/badge/version-1.3.0-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.3.1" src="https://img.shields.io/badge/version-1.3.1-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -121,8 +121,6 @@ check you already ask Claude to echo.
 - **Max for at most 10 minutes in a row**, then medium until your next prompt.
 - **Weekly budget step:** while you are spending faster than your week allows, every count in the rules goes one
   higher, so the higher levels need more reason. The budget never lowers an answer Claude already gave.
-- **Subagent note:** over half of the week's limit, a call that starts a native subagent carries a note suggesting a
-  lighter helper. It is never blocked.
 
 ### 🤖 Models
 
@@ -228,7 +226,7 @@ adaptive-effort keeps running the build it had, or none, until you reload it.
    or start a new session.
 
 2. **Check the build.** Run `/adaptive-effort`. Its first line names the version this session loaded, for example
-   `version 1.3.0 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
+   `version 1.3.1 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
    back to step 1.
 
 3. **Open the pane.** It opens by itself when a session starts. After a reload, or when it is hidden behind another
@@ -257,7 +255,7 @@ claude plugin test path/to/adaptive-effort
 ```
 
 The tests cover answer parsing, the hold and the max limit, the budget step and the usage line, the conditions and
-your own definitions, the pane, its buttons and Settings, saved defaults, model ranges, the subagent note, and the chart: its buckets, the 24-hour deletion, the table, the fixed frame, and
+your own definitions, the pane, its buttons and Settings, saved defaults, model ranges, and the chart: its buckets, the 24-hour deletion, the table, the fixed frame, and
 keeping it across a restart and a plugin reload.
 
 ## 🔒 Privacy and cost

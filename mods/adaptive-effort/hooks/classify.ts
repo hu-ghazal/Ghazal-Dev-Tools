@@ -187,20 +187,6 @@ export function weeklyBudget(limits: readonly RateLimit[], now: number, samples:
 /** Over the weekly budget: the rest of the week pays for less than the current spend. */
 export const overBudget = (b: Budget | undefined): boolean => b !== undefined && b.h < 1
 
-/** Over this share of the 7-day limit, native subagents are flagged as not preferred. */
-export const SUBAGENT_FLAG_PERCENT = 50
-/** The tools that spawn a native subagent. */
-export const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
-
-/** The note when 7-day use is over SUBAGENT_FLAG_PERCENT, else undefined. A note only: the call is never blocked. */
-export function subagentFlag(limits: readonly RateLimit[]): string | undefined {
-  const w = sevenDay(limits)
-  if (!w || !(w.used > SUBAGENT_FLAG_PERCENT)) return undefined
-  return (
-    `Weekly usage is ${w.used}%, over ${SUBAGENT_FLAG_PERCENT}%: native subagents are not preferred now (not blocked). ` +
-    'Prefer a lighter alternative for helper work, such as a cheaper model or an external worker, where one is available.'
-  )
-}
 
 /**
  * Claude's effort answer: a Bash call `echo "EFFORT=<level>"`, which the line beside each prompt asks for. The level is
@@ -460,8 +446,7 @@ export function rulesLine(
     (why ? ` (Counts in force: ${why}.)` : '') +
     ' When the work changes, echo a new EFFORT; drop back as soon as the hard part ends. ' +
     usageLine(b, session) +
-    ` Limits applied by the mod: ${MIN_DWELL_MS / 1000} s between changes; max at most ${MAX_HOLD_MS / 60_000} minutes, then medium until the next prompt.` +
-    (over ? ' Over budget, prefer lighter helpers over native subagents.' : '')
+    ` Limits applied by the mod: ${MIN_DWELL_MS / 1000} s between changes; max at most ${MAX_HOLD_MS / 60_000} minutes, then medium until the next prompt.`
   )
 }
 

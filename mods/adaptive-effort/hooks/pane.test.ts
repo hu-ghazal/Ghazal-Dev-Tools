@@ -243,7 +243,7 @@ describe('controls', () => {
       expect((sent?.context ?? []).join('\n').includes('(general: a quick, clear task)'), `pane.test.ts:saved-definitions-${n}`).toBe(true)
     }
   })
-  // Operator 2026-10-16: "how to turn on and off effort? is it explained in github?!!!" then "yes, update clearly".
+  // Turning the mod off and on from the pane, kept for new sessions.
   test('Turn off and Turn on: the button, the choice kept for new sessions, and the command', async ($, on) => {
     mock.clock(on)
     mock.store(on)
