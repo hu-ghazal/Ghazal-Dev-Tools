@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="410" viewBox="0 0 760 410" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<rect width="760" height="410" rx="14" fill="#1C1C1A"/>
+<rect x="32.0" y="20" width="168.0" height="74" rx="10" fill="#262624"/>
+<text x="46.0" y="44" font-size="12.5" fill="#8E8C86">Model calls</text>
+<text x="46.0" y="78" font-size="28" font-weight="700" fill="#C9C7C1">1,413<tspan font-size="13" font-weight="400" fill="#8E8C86" dx="6">in 12 h</tspan></text>
+<rect x="208.0" y="20" width="168.0" height="74" rx="10" fill="#262624"/>
+<text x="222.0" y="44" font-size="12.5" fill="#8E8C86">Effort answers</text>
+<text x="222.0" y="78" font-size="28" font-weight="700" fill="#C9C7C1">36<tspan font-size="13" font-weight="400" fill="#8E8C86" dx="6"></tspan></text>
+<rect x="384.0" y="20" width="168.0" height="74" rx="10" fill="#262624"/>
+<text x="398.0" y="44" font-size="12.5" fill="#8E8C86">Effort changes</text>
+<text x="398.0" y="78" font-size="28" font-weight="700" fill="#C9C7C1">12<tspan font-size="13" font-weight="400" fill="#8E8C86" dx="6"></tspan></text>
+<rect x="560.0" y="20" width="168.0" height="74" rx="10" fill="#262624"/>
+<text x="574.0" y="44" font-size="12.5" fill="#8E8C86">Runs of max</text>
+<text x="574.0" y="78" font-size="28" font-weight="700" fill="#C9C7C1">3<tspan font-size="13" font-weight="400" fill="#8E8C86" dx="6"></tspan></text>
+<rect x="32" y="113" width="11" height="11" rx="2" fill="#B5D4F4"/>
+<text x="49" y="123" font-size="13" fill="#C9C7C1">Medium 34%</text>
+<rect x="151" y="113" width="11" height="11" rx="2" fill="#378ADD"/>
+<text x="168" y="123" font-size="13" fill="#C9C7C1">High 55%</text>
+<rect x="254" y="113" width="11" height="11" rx="2" fill="#0B3A6B"/>
+<text x="271" y="123" font-size="13" fill="#C9C7C1">Max 11%</text>
+<line x1="62" x2="732" y1="330.0" y2="330.0" stroke="#3A3936"/>
+<text x="54" y="334.0" font-size="11" text-anchor="end" fill="#8E8C86">0%</text>
+<line x1="62" x2="732" y1="282.5" y2="282.5" stroke="#3A3936"/>
+<text x="54" y="286.5" font-size="11" text-anchor="end" fill="#8E8C86">25%</text>
+<line x1="62" x2="732" y1="235.0" y2="235.0" stroke="#3A3936"/>
+<text x="54" y="239.0" font-size="11" text-anchor="end" fill="#8E8C86">50%</text>
+<line x1="62" x2="732" y1="187.5" y2="187.5" stroke="#3A3936"/>
+<text x="54" y="191.5" font-size="11" text-anchor="end" fill="#8E8C86">75%</text>
+<line x1="62" x2="732" y1="140.0" y2="140.0" stroke="#3A3936"/>
+<text x="54" y="144.0" font-size="11" text-anchor="end" fill="#8E8C86">100%</text>
+<rect x="69.9" y="140.0" width="45.1" height="190.0" fill="#B5D4F4"/>
+<rect x="130.8" y="227.2" width="45.1" height="102.8" fill="#B5D4F4"/>
+<rect x="130.8" y="140.0" width="45.1" height="87.2" fill="#378ADD"/>
+<rect x="191.7" y="220.9" width="45.1" height="109.1" fill="#B5D4F4"/>
+<rect x="191.7" y="203.6" width="45.1" height="17.3" fill="#378ADD"/>
+<rect x="191.7" y="140.0" width="45.1" height="63.6" fill="#0B3A6B"/>
+<rect x="252.6" y="225.2" width="45.1" height="104.8" fill="#B5D4F4"/>
+<rect x="252.6" y="140.0" width="45.1" height="85.2" fill="#378ADD"/>
+<rect x="313.6" y="140.0" width="45.1" height="190.0" fill="#B5D4F4"/>
+<rect x="374.5" y="140.0" width="45.1" height="190.0" fill="#B5D4F4"/>
+<rect x="435.4" y="140.0" width="45.1" height="190.0" fill="#B5D4F4"/>
+<rect x="496.3" y="210.1" width="45.1" height="119.9" fill="#B5D4F4"/>
+<rect x="496.3" y="140.0" width="45.1" height="70.1" fill="#0B3A6B"/>
+<rect x="557.2" y="329.3" width="45.1" height="0.7" fill="#B5D4F4"/>
+<rect x="557.2" y="140.0" width="45.1" height="189.3" fill="#378ADD"/>
+<rect x="618.1" y="140.0" width="45.1" height="190.0" fill="#378ADD"/>
+<rect x="679.0" y="285.3" width="45.1" height="44.7" fill="#B5D4F4"/>
+<rect x="679.0" y="140.0" width="45.1" height="145.3" fill="#378ADD"/>
+<text x="92.5" y="348" font-size="11" text-anchor="middle" fill="#8E8C86">0h</text>
+<text x="336.1" y="348" font-size="11" text-anchor="middle" fill="#8E8C86">5h</text>
+<text x="579.7" y="348" font-size="11" text-anchor="middle" fill="#8E8C86">9h</text>
+<text x="32" y="374" font-size="13" fill="#C9C7C1">Share of model calls at each effort, per hour</text>
+</svg>

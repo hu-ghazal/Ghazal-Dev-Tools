@@ -2,6 +2,12 @@
   <img src="assets/banner.svg" alt="adaptive-effort: Claude shifts its own thinking gear" width="100%">
 </p>
 
+<p align="center">
+  <img src="assets/effort-history.svg" alt="Twelve hours of one real Claude Code session with adaptive-effort: 1,413 model calls, 36 effort answers, 12 effort changes and 3 runs of max; per hour, the share of calls at medium, high and max" width="100%">
+  <br>
+  <sub>Twelve hours of one real session: Claude stays on medium for easy stretches and shifts up to high or max when the work gets hard.</sub>
+</p>
+
 <h1 align="center">🏎️ adaptive-effort</h1>
 
 <p align="center">
