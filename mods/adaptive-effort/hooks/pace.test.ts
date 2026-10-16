@@ -102,16 +102,16 @@ describe('weekly budget', () => {
     expect(log.samples, 'pace.test.ts:53').toEqual([{ at: 360_000, used: 1 }])
   })
 
-  test('over budget every count is one higher in the line beside the prompt, and it names lighter helpers', () => {
+  test('over budget every count is one higher in the line beside the prompt, and it names no helpers', () => {
     const w = rulesLine(STANDARD, weeklyBudget(week(77), 0))
     const want = [
       'weekly usage over budget at 77%, every count one higher',
       'a bug whose cause is still unknown after 3 attempts (general: a problem whose cause is still unknown after 3 attempts)',
       'xhigh: the same test or check fails a 4th time (general: the same problem comes back a 4th time)',
       'high: 4 or more files that must stay consistent (general: 4 or more pieces that must agree with each other); 6 or more steps',
-      'prefer lighter helpers',
     ]
     expect(want.filter(x => !w.includes(x)), 'pace.test.ts:weight').toEqual([])
+    expect(w.includes('helpers'), 'pace.test.ts:one-helper-rule').toBe(false)
     const within = rulesLine(STANDARD, weeklyBudget(week(10), 0))
     expect([within.includes('over budget'), within.includes('a bug whose cause is still unknown after 2 attempts'), within.includes('echo "EFFORT=')], 'pace.test.ts:no-weight').toEqual([false, true, true])
   })
@@ -129,7 +129,7 @@ describe('weekly budget', () => {
     expect(efforts, 'pace.test.ts:77').toEqual(['max', 'max'])
     const text = await show($)
     expect(text.includes('77% used, 23% left over'), 'pace.test.ts:79').toBe(true)
-    expect(text.includes('the effort sent is never lowered'), 'pace.test.ts:80').toBe(true)
+    expect(text.includes('an answer Claude gave is never cut down'), 'pace.test.ts:80').toBe(true)
   })
 
   test('within budget at the standard thresholds, the rules line has no budget step, and max stays', async ($, on) => {
