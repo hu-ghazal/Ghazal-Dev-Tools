@@ -1,3 +1,8 @@
+// adaptive-effort · Copyright (c) 2026 hu-ghazal · https://github.com/hu-ghazal/Ghazal-Dev-Tools
+// Shared under the PolyForm Noncommercial License 1.0.0 (see LICENSE). You are welcome to use, study and adapt it for
+// noncommercial purposes; please keep this notice and the licence with any copy, and credit the original.
+// Commercial use needs a separate licence.
+
 import type { ChartBucket, ChartLog, EffortLevel } from '../types'
 
 // The pane's chart: per 15 minutes, the output tokens (thinking included) each effort level spent, stacked in one
@@ -135,6 +140,19 @@ export function chartView(log: ChartLog, now: number): ChartView {
     }
   }
   return { minutes, bars: shown, calls, tokens, callTokens }
+}
+
+export type SessionUse = { calls: number; tokens: Four }
+/** This session's calls with usage and their output tokens in the last hour (the 15-minute buckets that start in it),
+ *  by level: what Claude weighs before it answers EFFORT. */
+export function lastHourUse(log: ChartLog, now: number): SessionUse {
+  const use: SessionUse = { calls: 0, tokens: zero() }
+  for (const x of log.buckets) {
+    if (x.at <= now - 3_600_000) continue
+    use.calls += total(x.nt ?? zero())
+    for (let i = 0; i < 4; i++) use.tokens[i] += x.tok?.[i] ?? 0
+  }
+  return use
 }
 
 /** Tokens in thousands: `0.7k`, `12k`, `1.2M`. */

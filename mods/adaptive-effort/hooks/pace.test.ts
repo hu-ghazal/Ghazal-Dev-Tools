@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { STANDARD, rulesLine, trackPace, weeklyBudget } from './classify'
+import { EMPTY_CHART, lastHourUse, recordStep } from './chart'
+import { STANDARD, rulesLine, trackPace, usageLine, weeklyBudget } from './classify'
 
 
 const OPUS = 'claude-opus-5-5'
@@ -33,15 +34,63 @@ const show = async ($: any) =>
   JSON.stringify(await $.command.run({ command: 'adaptive-effort', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } }))
 
 describe('weekly budget', () => {
+  test('beside every prompt Claude sees the usage, the one cost rule of its pace, and the project signals', () => {
+    const room = rulesLine(STANDARD, weeklyBudget(week(10), 0)) // 90% over 96 h: 22.5% a day allowed, 3.3% a day spent
+    const near = rulesLine(STANDARD, weeklyBudget(week(40), 0)) // 60% over 96 h: 15% a day allowed, 13.3% a day spent
+    const over = rulesLine(STANDARD, weeklyBudget(week(77), 0)) // 23% over 96 h: 5.8% a day allowed, 25.7% a day spent
+    const none = rulesLine(STANDARD, undefined)
+    const want: [string, string, string][] = [
+      [room, 'Usage: this week 10% used, 90% left for 96 h: 22.5% a day allowed, spending 3.3% a day (the week so far)', 'room-figures'],
+      [room, 'Room in the week:', 'room-rule'],
+      [near, 'this week 40% used, 60% left for 96 h: 15% a day allowed, spending 13.3% a day', 'near-figures'],
+      [near, "Close to the week's pace:", 'near-rule'],
+      [over, 'Spending faster than the week allows:', 'over-rule'],
+      [none, 'Usage: no weekly reading yet.', 'none'],
+    ]
+    expect(want.filter(([l, x]) => !l.includes(x)).map(w => w[2]), 'pace.test.ts:usage-figures').toEqual([])
+    // Where several levels fit, the choice is Claude's, by the work and the usage.
+    for (const l of [room, near, over, none]) {
+      expect(l.includes('When the conditions of more than one level fit, the choice among them is yours, by the work in front of you and this usage.'), 'pace.test.ts:free-choice').toBe(true)
+    }
+    // Only the rule of the pace in force: no rule for another pace to weigh.
+    const rules = ['Room in the week:', "Close to the week's pace:", 'Spending faster than the week allows:']
+    expect([room, near, over, none].map(l => rules.filter(r => l.includes(r)).length), 'pace.test.ts:one-rule').toEqual([1, 1, 1, 0])
+    for (const l of [room, near, over, none]) {
+      expect(l.includes('Usage never raises a level the conditions do not support.'), 'pace.test.ts:never-raises').toBe(true)
+      expect(l.includes('answer one level higher, never max on these alone'), 'pace.test.ts:project-signals').toBe(true)
+    }
+  })
+
+  test("the session's output of the last hour goes into the line, by level", () => {
+    let log = recordStep(EMPTY_CHART, 'medium', 0, 99_000) // more than an hour before: not counted
+    log = recordStep(log, 'high', 90 * 60_000, 10_000)
+    log = recordStep(log, 'high', 100 * 60_000, 2_000)
+    log = recordStep(log, 'medium', 140 * 60_000, 1_900)
+    const use = lastHourUse(log, 141 * 60_000)
+    expect(use, 'pace.test.ts:last-hour').toEqual({ calls: 3, tokens: [1_900, 12_000, 0, 0] })
+    expect(rulesLine(STANDARD, undefined, use).includes('This session, last hour: 3 calls, 14k output tokens (medium 1.9k, high 12k).'), 'pace.test.ts:session-line').toBe(true)
+    expect(usageLine(undefined, lastHourUse(EMPTY_CHART, 0)).includes('This session, last hour: no calls yet.'), 'pace.test.ts:session-none').toBe(true)
+  })
+
   test('the budget is what is left over the hours left, against the spend', () => {
     // 77% used, 23% left over 96 h: 0.2396%/h allowed; the week so far spent 77% in 72 h, 1.069%/h.
     const b = weeklyBudget(week(77), 0)
     expect([b?.basis, Math.round((b?.allowed ?? 0) * 1e4), Math.round((b?.burn ?? 0) * 1e4), Math.round((b?.h ?? 0) * 1000)], 'pace.test.ts:39').toEqual(['week', 2396, 10694, 224])
-    // Once the readings span 30 min, the recent spend decides: 1% in the last hour.
-    const recent = weeklyBudget(week(77), H, [{ at: 0, used: 76 }])
+    // Two rises an hour apart: the recent spend decides, 1% in that hour.
+    const recent = weeklyBudget(week(77), 70 * 60_000, [{ at: 0, used: 75 }, { at: 10 * 60_000, used: 76 }])
     expect([recent?.basis, Math.round((recent?.burn ?? 0) * 1000)], 'pace.test.ts:42').toEqual(['recent', 1000])
     expect(weeklyBudget(week(77), 10 * 60_000, [{ at: 0, used: 76.9 }])?.basis, 'pace.test.ts:43').toBe('week')
     expect(weeklyBudget([{ kind: 'five_hour', percentUsed: 90, resetsAt: RESETS }], 0), 'pace.test.ts:44').toBe(undefined)
+  })
+
+  test('the whole-percent reading: unchanged or one rise is no rate; two rises too close or out of the window are none either', () => {
+    const flat = weeklyBudget(week(77), 40 * 60_000, [{ at: 0, used: 77 }])
+    const one = weeklyBudget(week(77), 40 * 60_000, [{ at: 0, used: 76 }, { at: 5 * 60_000, used: 77 }])
+    const close = weeklyBudget(week(77), 30 * 60_000, [{ at: 0, used: 75 }, { at: 5 * 60_000, used: 76 }, { at: 20 * 60_000, used: 77 }])
+    const old = weeklyBudget(week(77), 8 * H, [{ at: 0, used: 75 }, { at: H, used: 76 }, { at: 2 * H, used: 77 }])
+    expect([flat, one, close, old].map(b => b?.basis), 'pace.test.ts:no-rate').toEqual(['week', 'week', 'week', 'week'])
+    const kept = weeklyBudget(week(77), 5 * H, [{ at: 0, used: 75 }, { at: H, used: 76 }, { at: 3 * H, used: 77 }])
+    expect([kept?.basis, Math.round((kept?.burn ?? 0) * 1000)], 'pace.test.ts:rate').toEqual(['recent', 500])
   })
 
   test('readings are kept every 5 minutes inside the 2-hour window, and a new week starts over', () => {
@@ -57,14 +106,14 @@ describe('weekly budget', () => {
     const w = rulesLine(STANDARD, weeklyBudget(week(77), 0))
     const want = [
       'weekly usage over budget at 77%, every count one higher',
-      'max: a design or architecture decision with real trade-offs; a failure still unexplained after 3 attempts; a change across 3 or more systems',
-      'xhigh: the same kind of failure a 4th time',
-      'high: 4 or more files or components that must stay consistent; a procedure of 6 or more steps with checks',
+      'a bug whose cause is still unknown after 3 attempts (general: a problem whose cause is still unknown after 3 attempts)',
+      'xhigh: the same test or check fails a 4th time (general: the same problem comes back a 4th time)',
+      'high: 4 or more files that must stay consistent (general: 4 or more pieces that must agree with each other); 6 or more steps',
       'prefer lighter helpers',
     ]
     expect(want.filter(x => !w.includes(x)), 'pace.test.ts:weight').toEqual([])
     const within = rulesLine(STANDARD, weeklyBudget(week(10), 0))
-    expect([within.includes('over budget'), within.includes('a failure still unexplained after 2 attempts'), within.includes('echo "EFFORT=')], 'pace.test.ts:no-weight').toEqual([false, true, true])
+    expect([within.includes('over budget'), within.includes('a bug whose cause is still unknown after 2 attempts'), within.includes('echo "EFFORT=')], 'pace.test.ts:no-weight').toEqual([false, true, true])
   })
 
   test('over budget, the prompt carries the thresholds line and an answered max stays max (no cap)', async ($, on) => {
@@ -89,6 +138,7 @@ describe('weekly budget', () => {
     await $.turn.start({ turnId: 't1', text: SIMPLE })
     const sent: any = await $.prompt.submit({ text: SIMPLE } as any)
     expect((sent?.context ?? []).map((c: string) => c.includes('over budget')), 'pace.test.ts:no-line').toEqual([false])
+    expect((sent?.context ?? []).map((c: string) => c.includes('Usage: this week 40% used') && c.includes('This session, last hour: no calls yet.')), 'pace.test.ts:usage-beside-prompt').toEqual([true])
     await answer($, 'max')
     await step($, 0)
     await clock.advance(121_000)

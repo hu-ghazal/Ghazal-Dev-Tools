@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { STANDARD, countsIn, levelRules, stepped } from './classify'
+import { DEFAULT_DEFINITIONS, STANDARD, countsIn, levelRules, stepped } from './classify'
 
 
 const OPUS = 'claude-opus-5-5'
@@ -39,13 +39,13 @@ const command = ($: any, args: string) =>
 describe('controls', () => {
   test('Harder on max raises only the max counts and makes a design decision need that many systems', () => {
     const r = levelRules(countsIn(stepped(STANDARD, 'max', 1), false))
-    expect(r.max, 'pane.test.ts:max-harder').toEqual([
-      'a design or architecture decision with real trade-offs that spans 3 or more systems',
-      'a failure still unexplained after 3 attempts',
-      'a change across 3 or more systems where a wrong fix is likely',
+    expect(r.max.map(x => x.code), 'pane.test.ts:max-harder').toEqual([
+      'changing a shared interface (API, schema, data format, config contract) that 3 or more places use',
+      'a bug whose cause is still unknown after 3 attempts',
+      'a change across 3 or more modules or services that must ship together',
     ])
-    expect([r.xhigh[0], r.high[0]], 'pane.test.ts:others-unchanged').toEqual(['the same kind of failure a 3rd time', '3 or more files or components that must stay consistent'])
-    expect(levelRules(countsIn(STANDARD, true)).max[0], 'pane.test.ts:budget-keeps-design-max').toBe('a design or architecture decision with real trade-offs')
+    expect([r.xhigh[0].code, r.high[0].code], 'pane.test.ts:others-unchanged').toEqual(['the same test or check fails a 3rd time', '3 or more files that must stay consistent'])
+    expect(levelRules(countsIn(STANDARD, true)).max[0].code, 'pane.test.ts:budget-keeps-design-max').toBe('changing a shared interface (API, schema, data format, config contract) that 2 or more places use')
     expect(stepped(stepped(stepped(stepped(STANDARD, 'max', 1), 'max', 1), 'max', 1), 'max', 1).max, 'pane.test.ts:step-max').toBe(3)
   })
 
@@ -59,17 +59,24 @@ describe('controls', () => {
       for (const l of ['max', 'xhigh', 'high']) {
         expect([await ui.find({ type: 'Button', key: `${l}-easier` }), await ui.find({ type: 'Button', key: `${l}-harder` })].every(x => x !== undefined), `pane.test.ts:${surface}:${l}-buttons`).toBe(true)
       }
-      expect(await ui.find({ type: 'Text', text: /^• a failure still unexplained after 2 attempts$/ }), `pane.test.ts:${surface}:max-line`).toBeDefined()
+      // The controls print no conditions; Settings edits them.
+      expect(await ui.find({ type: 'Text', text: /^• / }), `pane.test.ts:${surface}:no-conditions`).toBe(undefined)
+      expect(await ui.find({ type: 'Button', key: 'settings' }), `pane.test.ts:${surface}:settings`).toBeDefined()
       // The pane says what a press changes: the conditions, and the effort follows Claude's next answer.
-      expect(await ui.find({ type: 'Text', text: /^Claude picks the first level whose conditions match the work\. Easier or Harder changes the conditions; the effort follows Claude's next answer\.$/ }), `pane.test.ts:${surface}:explain`).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage\. Easier or Harder changes the conditions; the effort follows Claude's next answer\.$/ }), `pane.test.ts:${surface}:explain`).toBeDefined()
       expect([await ui.find({ type: 'Text', text: /sooner|later/i }), await ui.find({ type: 'Svg' }), await ui.find({ type: 'Client' })], `pane.test.ts:${surface}:no-timing-no-graphic`).toEqual([undefined, undefined, undefined])
+      // Each card: a four-word definition, the setting only when changed; no "standard" and no "the rest".
+      for (const line of ['Hard-to-undo or unexplained problems', 'Repeated or surprising failures', 'Many parts, many checks', 'Clear steps, easily undone']) {
+        expect(await ui.find({ type: 'Text', text: line }), `pane.test.ts:${surface}:summary:${line}`).toBeDefined()
+      }
+      expect([await ui.find({ type: 'Text', text: /standard|^the rest$/ }), await ui.find({ type: 'Button', key: 'reset' })].map(x => x?.text ?? x?.props?.label), `pane.test.ts:${surface}:default-words`).toEqual([undefined, 'Reset to default'])
       await ui.press({ key: 'max-harder' })
-      expect(await ui.find({ type: 'Text', text: /^• a failure still unexplained after 3 attempts$/ }), `pane.test.ts:${surface}:max-harder`).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^Hard-to-undo or unexplained problems · harder \+1$/ }), `pane.test.ts:${surface}:max-harder`).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /\(current settings not saved\)/ }), `pane.test.ts:${surface}:unsaved`).toBeDefined()
       await ui.press({ key: 'save' })
-      expect(await ui.find({ type: 'Text', text: /^Default for new sessions: max harder \+1, xhigh standard, high standard$/ }), `pane.test.ts:${surface}:saved`).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^Default for new sessions: max harder \+1, xhigh default, high default$/ }), `pane.test.ts:${surface}:saved`).toBeDefined()
       await ui.press({ key: 'reset' })
-      expect(await ui.find({ type: 'Text', text: /^Default for new sessions: standard$/ }), `pane.test.ts:${surface}:reset`).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^Default for new sessions: the defaults$/ }), `pane.test.ts:${surface}:reset`).toBeDefined()
       await ui.unmount()
     }
     // Auto stays: the thresholds change what Claude reads, never the effort sent; Claude's answer decides.
@@ -190,7 +197,50 @@ describe('controls', () => {
     await start($)
     const sent: any = await $.prompt.submit({ text: 'next' } as any)
     const line = (sent?.context ?? []).join('\n')
-    expect(line.includes('thresholds set by the user: max harder +1, xhigh standard, high standard'), 'pane.test.ts:saved-default').toBe(true)
-    expect(line.includes('a failure still unexplained after 3 attempts'), 'pane.test.ts:saved-counts').toBe(true)
+    expect(line.includes('thresholds set by the user: max harder +1, xhigh default, high default'), 'pane.test.ts:saved-default').toBe(true)
+    expect(line.includes('a bug whose cause is still unknown after 3 attempts'), 'pane.test.ts:saved-counts').toBe(true)
+  })
+
+  test('Settings shows each definition in a field; Enter saves it for Claude and new sessions; Reset brings back the defaults', async ($, on) => {
+    mock.clock(on)
+    mock.store(on)
+    harness(on)
+    on('prompt.submit', ($: any, e: any) => ({ text: e.text, context: e.context }))
+    await start($)
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface, ...PANE })
+      expect(await ui.find({ type: 'Input', key: 'def-high-0-code' }), `pane.test.ts:${surface}:settings-closed`).toBe(undefined)
+      await ui.press({ key: 'settings' })
+      expect((await ui.find({ type: 'Input', key: 'def-high-0-code' }))?.props?.value, `pane.test.ts:${surface}:settings-field`).toBe(DEFAULT_DEFINITIONS.high[0].code)
+      expect([await ui.find({ type: 'Button', key: 'max-harder' }), await ui.find({ type: 'Input', key: 'def-medium-0-general' })].map(x => x !== undefined), `pane.test.ts:${surface}:settings-view`).toEqual([false, true])
+      await ui.input({ key: 'def-high-0-code', text: '{n} or more source files changed together', kind: 'submit' })
+      await ui.input({ key: 'def-high-0-general', text: '{n} or more parts changed together', kind: 'submit' })
+      const sent: any = await $.prompt.submit({ text: 'next' } as any)
+      const line = (sent?.context ?? []).join('\n')
+      expect([line.includes('3 or more source files changed together (general: 3 or more parts changed together)'), line.includes('definitions set by the user')], `pane.test.ts:${surface}:settings-claude`).toEqual([true, true])
+      await ui.press({ key: 'definitions-reset' })
+      const back: any = await $.prompt.submit({ text: 'again' } as any)
+      expect((back?.context ?? []).join('\n').includes('definitions set by the user'), `pane.test.ts:${surface}:settings-reset`).toBe(false)
+      await ui.press({ key: 'settings' })
+      expect(await ui.find({ type: 'Button', key: 'max-harder' }), `pane.test.ts:${surface}:settings-done`).toBeDefined()
+      await ui.unmount()
+    }
+  })
+
+  test('a new session starts from the saved definitions, and the next start keeps them', async ($, on) => {
+    mock.clock(on)
+    mock.store(on)
+    harness(on)
+    on('prompt.submit', ($: any, e: any) => ({ text: e.text, context: e.context }))
+    await start($)
+    const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    await ui.press({ key: 'settings' })
+    await ui.input({ key: 'def-medium-0-general', text: 'a quick, clear task', kind: 'submit' })
+    await ui.unmount()
+    for (const n of [1, 2]) {
+      await start($)
+      const sent: any = await $.prompt.submit({ text: `next ${n}` } as any)
+      expect((sent?.context ?? []).join('\n').includes('(general: a quick, clear task)'), `pane.test.ts:saved-definitions-${n}`).toBe(true)
+    }
   })
 })

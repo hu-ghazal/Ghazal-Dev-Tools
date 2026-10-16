@@ -1,3 +1,8 @@
+// adaptive-effort · Copyright (c) 2026 hu-ghazal · https://github.com/hu-ghazal/Ghazal-Dev-Tools
+// Shared under the PolyForm Noncommercial License 1.0.0 (see LICENSE). You are welcome to use, study and adapt it for
+// noncommercial purposes; please keep this notice and the licence with any copy, and credit the original.
+// Commercial use needs a separate licence.
+
 export type EffortLevel = 'medium' | 'high' | 'xhigh' | 'max'
 
 // The hold base, the max clock and Claude's latest EFFORT answer (level 0-3, when
@@ -43,6 +48,8 @@ declare module 'claude-code' {
       thresholds: Thresholds
       saved: Thresholds
       chart: ChartLog
+      definitions: import('../hooks/classify').Definitions
+      editing: boolean
     }
   }
 }

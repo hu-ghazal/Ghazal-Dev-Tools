@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="adaptive-effort: Claude shifts its own thinking gear" width="100%">
+  <img src="assets/banner.svg" alt="adaptive-effort, a Claude Code plugin: Claude shifts its own reasoning effort like an automatic gearbox" width="100%">
 </p>
 
 <p align="center">
@@ -8,15 +8,16 @@
   <sub>Twelve hours of one real session: Claude stays on medium for easy stretches and shifts up to high or max when the work gets hard.</sub>
 </p>
 
-<h1 align="center">🏎️ adaptive-effort</h1>
+<h1 align="center">🏎️ adaptive-effort: automatic reasoning effort for Claude Code</h1>
 
 <p align="center">
   <b>An automatic gearbox for Claude's thinking.</b><br>
-  A Claude Code mod that lets Claude shift its own reasoning effort, by clear rules you control.
+  A Claude Code plugin (mod) that lets Claude choose its own reasoning effort, from medium to max, from the work in
+  front of it, your usage limits and your project, by clear rules you control.
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.0.2" src="https://img.shields.io/badge/version-1.0.2-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.1.0" src="https://img.shields.io/badge/version-1.1.0-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -32,33 +33,72 @@ shifting smooth and the most expensive gear short.
 ## ✨ Highlights
 
 - 🔴 **Auto mode.** Claude picks its own gear for the work in front of it: medium, high, xhigh or max.
-- ⚙️ **Clear shift rules.** Each gear has counted conditions (attempts, files, systems, steps), not vague feelings.
+- ⚙️ **Clear shift rules.** Each gear has counted conditions (attempts, files, systems, steps), not vague feelings,
+  each in a version for code work and one for any other work. You can rewrite them in Settings.
 - 🎚️ **You set the difficulty.** Make max, xhigh or high harder or easier to reach, one step at a time.
 - ⏱️ **Smooth shifting.** At least 60 seconds between changes, so the effort never flickers.
 - 🛑 **Rev limiter on max.** Ten minutes in a row at most, then back to medium until your next prompt.
 - 💰 **Budget aware.** When your weekly usage runs ahead of the week, every gear gets one step harder to reach.
+- 🧠 **Weighs cost and project.** Claude sees your usage and its own recent output before each answer, and reads the
+  project for what makes a mistake costly.
 - 👀 **Watch it live.** A chart in the pane shows the output tokens each gear spends, per 15 minutes, as you work.
 - 🔒 **Local and free.** No model calls, no network requests.
 
-## 🧭 How it works
+## 🧠 How Claude decides its effort
 
-1. **Beside every prompt**, the mod adds the effort rules and asks Claude to answer with one Bash call:
+Beside every prompt, adaptive-effort shows Claude four kinds of information. Claude weighs them and answers with one
+line, `echo "EFFORT=high"`, and the mod sends that level to the model for the steps that follow.
 
-   ```bash
-   echo "EFFORT=high"
-   ```
+```mermaid
+flowchart LR
+  W["🧩 The work ahead"]:::input --> C
+  U["📈 Your usage<br/>this week and this session"]:::input --> C
+  P["🏗️ The project<br/>what a mistake would cost"]:::input --> C
+  S["🎚️ Your settings<br/>Easier · Harder · definitions"]:::input --> C
+  C{"Claude answers<br/>EFFORT = level"}:::claude --> L["⏱️ Smooth shifting<br/>and the max limit"]:::mod
+  L --> E(["Effort sent<br/>medium · high · xhigh · max"]):::out
+  classDef input fill:#B5D4F4,stroke:#185FA5,color:#042C53
+  classDef claude fill:#378ADD,stroke:#042C53,color:#FFFFFF
+  classDef mod fill:#185FA5,stroke:#042C53,color:#FFFFFF
+  classDef out fill:#042C53,stroke:#042C53,color:#FFFFFF
+```
 
-2. **Claude picks the first level whose conditions match** the coming work:
+| What Claude reads | What it tells Claude |
+|---|---|
+| 🧩 **The work ahead** | Which level's conditions the coming steps meet: how many files must stay consistent, whether a cause is still unknown, whether something that worked has broken again. |
+| 📈 **Your usage** | How much of your weekly limit is used and how much is left, whether you are spending faster than the rest of the week allows, and how much this session has produced lately, level by level. |
+| 🏗️ **The project** | Where a mistake costs more: no tests to catch it, production, security or payment code, a shared or public repository, code not read yet. |
+| 🎚️ **Your settings** | How hard you made each level to reach, and your own wording of the conditions. |
 
-   | Level | When (standard thresholds) |
-   |---|---|
-   | max | a design or architecture decision with real trade-offs; a failure still unexplained after 2 attempts; a change across 2 or more systems where a wrong fix is likely |
-   | xhigh | the same kind of failure a 3rd time; a fix that did not hold; results that contradict expectations |
-   | high | 3 or more files or components that must stay consistent; a procedure of 5 or more steps with checks |
-   | medium | everything else: small fixes, reading, reporting, routine edits |
+How the four come together:
 
-3. **The mod sends that level** on the next steps of the main conversation. When the work changes, Claude echoes a new
-   level, and drops back as soon as the hard part ends.
+- **The work names the level.** When the conditions of more than one level fit, Claude chooses among them by the work
+  and your usage.
+- **Your usage leans, it never lifts.** Spending faster than your week allows, Claude leans to the lower of the levels
+  that fit; with room in the week, a higher level that fits is affordable for hard work. Usage never raises a level the
+  work does not call for.
+- **The project can add one level,** never up to max on its own.
+- **You stay in charge.** Easier and Harder move every count, Settings rewrites the conditions, and the mod keeps the
+  shifting smooth.
+
+### 📋 The default conditions
+
+At the default thresholds; **Harder** and **Easier** move the numbers, **Settings** changes the words.
+
+| Level | Code work | Any other work |
+|---|---|---|
+| <img alt="max" src="https://img.shields.io/badge/max-042C53?style=flat-square"> | changing a shared interface (API, schema, data format, config contract) that 2 or more places use | a decision that is hard to undo and that 2 or more other parts depend on |
+| | a bug whose cause is still unknown after 2 attempts | a problem whose cause is still unknown after 2 attempts |
+| | a change across 2 or more modules or services that must ship together | a change across 2 or more separate parts that must change together |
+| <img alt="xhigh" src="https://img.shields.io/badge/xhigh-185FA5?style=flat-square"> | the same test or check fails a 3rd time | the same problem comes back a 3rd time |
+| | a test or check that passed earlier fails again | something believed done turns out wrong |
+| | the code behaves differently from what reading it says | a result differs from what was expected |
+| <img alt="high" src="https://img.shields.io/badge/high-378ADD?style=flat-square"> | 3 or more files that must stay consistent | 3 or more pieces that must agree with each other |
+| | 5 or more steps, each confirmed by running something (build, test, script) | 5 or more steps, each needing its own check |
+| <img alt="medium" src="https://img.shields.io/badge/medium-B5D4F4?style=flat-square"> | anything smaller: a clear next step, such as reading, renames, docs, config values, a fix confirmed on its first run | anything smaller: a clear next step where a mistake is easy to see and undo |
+
+When the work changes, Claude answers again, and drops back as soon as the hard part ends. Nothing here is tied to one
+project or language: the conditions and the signals apply to any repository.
 
 The answer is free-standing: other words on the echo line are ignored, so the request can share a line with any other
 check you already ask Claude to echo.
@@ -67,9 +107,8 @@ check you already ask Claude to echo.
 
 - **60 seconds between changes**, so the effort does not flicker.
 - **Max for at most 10 minutes in a row**, then medium until your next prompt.
-- **Weekly budget step:** when the rest of your week's usage limit pays for less than you are currently spending, every
-  count in the rules goes one higher, so the higher levels need more reason. The budget never lowers an answer Claude
-  already gave.
+- **Weekly budget step:** while you are spending faster than your week allows, every count in the rules goes one
+  higher, so the higher levels need more reason. The budget never lowers an answer Claude already gave.
 - **Subagent note:** over half of the week's limit, a call that starts a native subagent carries a note suggesting a
   lighter helper. It is never blocked.
 
@@ -93,10 +132,10 @@ that trade-off in your hands:
 
 The pane opens at session start (`/adaptive-effort pane` brings it to the front). It shows:
 
-- the effort now, as a coloured pill, and one line on how Auto works;
-- one card each for **Max**, **Extra high** and **High**, every condition on its own line with the counts in force,
-  and **Easier** / **Harder** buttons;
-- **Save as default** and **Reset to standard**;
+- the effort now, as a coloured pill, a **Settings** button, and one line on how Auto works;
+- one card each for **Max**, **Extra high** and **High**, with a short definition of the level, your setting when
+  you changed it (harder +1, easier -1) and **Easier** / **Harder** buttons, then a card for **Medium**;
+- **Save as default** and **Reset to default**;
 - the live chart and table below.
 
 ### 📊 The live chart
@@ -113,8 +152,15 @@ The pane opens at session start (`/adaptive-effort pane` brings it to the front)
   session start, so the storage stays small.
 
 Each step **Harder** raises that level's counts by one; **Easier** lowers them (from easier -2 to harder +3). Harder on
-Max also makes a design decision count for max only when it spans that many systems. A change during a turn reaches
-Claude at its next tool call.
+Max also raises the number of places a shared interface or decision must reach. A change during a turn reaches Claude
+at its next tool call.
+
+### ⚙️ Settings: your own definitions
+
+**Settings** shows every condition's code and general text in a field. Edit one and press Enter: it is saved for every
+session and Claude reads it with the next prompt. Keep `{n}` where the count goes (Easier and Harder move it); `{nth}`
+writes it as 3rd, 4th. **Reset definitions to default** brings back the texts above. **Done** returns to the controls.
+The mobile app shows the texts but has no fields to edit them yet.
 
 ## ⌨️ Commands
 
@@ -124,7 +170,7 @@ Claude at its next tool call.
 | `/adaptive-effort pane` | Opens or raises the pane |
 | `/adaptive-effort max harder` | Makes a level harder or easier: `max`, `xhigh` or `high`, then `harder` or `easier` |
 | `/adaptive-effort save` | Keeps the current thresholds as the default for new sessions |
-| `/adaptive-effort reset` | Returns to the standard thresholds |
+| `/adaptive-effort reset` | Returns to the default thresholds |
 | `/adaptive-effort off` / `on` | Turns the mod off or on |
 
 ## 📦 Install
@@ -155,7 +201,7 @@ adaptive-effort keeps running the build it had, or none, until you reload it.
    or start a new session.
 
 2. **Check the build.** Run `/adaptive-effort`. Its first line names the version this session loaded, for example
-   `version 1.0.2 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
+   `version 1.1.0 is on`. An older number, or no reply at all, means the session has not loaded this build yet: go
    back to step 1.
 
 3. **Open the pane.** It opens by itself when a session starts. After a reload, or when it is hidden behind another
@@ -183,8 +229,8 @@ claude plugin validate path/to/adaptive-effort
 claude plugin test path/to/adaptive-effort
 ```
 
-The tests cover answer parsing, the hold and the max limit, the budget step, the pane and its buttons, saved defaults,
-model ranges, the subagent note, and the chart: its buckets, the 24-hour deletion, the table, the fixed frame, and
+The tests cover answer parsing, the hold and the max limit, the budget step and the usage line, the conditions and
+your own definitions, the pane, its buttons and Settings, saved defaults, model ranges, the subagent note, and the chart: its buckets, the 24-hour deletion, the table, the fixed frame, and
 keeping it across a restart and a plugin reload.
 
 ## 🔒 Privacy and cost
@@ -195,3 +241,9 @@ reports, and keeps its settings and each session's chart (for 24 hours) in Claud
 ## 📜 License
 
 PolyForm Noncommercial 1.0.0, as the rest of this repository. See [LICENSE](../../LICENSE).
+
+Required Notice: Copyright (c) 2026 hu-ghazal (https://github.com/hu-ghazal)
+
+You are welcome to use, study and adapt adaptive-effort for noncommercial purposes. Please keep the notice above and
+the licence with any copy or adaptation you share, and credit the original. Commercial use needs a separate licence:
+see the [repository README](../../README.md#license).

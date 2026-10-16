@@ -1,10 +1,15 @@
+// adaptive-effort · Copyright (c) 2026 hu-ghazal · https://github.com/hu-ghazal/Ghazal-Dev-Tools
+// Shared under the PolyForm Noncommercial License 1.0.0 (see LICENSE). You are welcome to use, study and adapt it for
+// noncommercial purposes; please keep this notice and the licence with any copy, and credit the original.
+// Commercial use needs a separate licence.
+
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, dwell, isStandard, levelName, levelRules, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, subagentFlag, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SUBAGENT_TOOLS } from './classify'
-import type { Raised, Thresholds } from './classify'
-import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, subagentFlag, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SUBAGENT_TOOLS } from './classify'
+import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
+import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
 
 // adaptive-effort: Claude decides its own reasoning effort. Beside each prompt the mod puts the effort rules and asks
@@ -24,10 +29,15 @@ const thresholds = atom({ plugin: 'adaptive-effort', key: 'thresholds' } as cons
 const saved = atom({ plugin: 'adaptive-effort', key: 'saved' } as const, STANDARD as Thresholds)
 // This session's calls and their output tokens per 15 minutes, for the pane's chart; saved in $.store for a restart.
 const chart = atom({ plugin: 'adaptive-effort', key: 'chart' } as const, EMPTY_CHART)
+// The level definitions Claude reads (the user's, saved in $.store, else the defaults), and whether the pane shows
+// their settings.
+const definitions = atom({ plugin: 'adaptive-effort', key: 'definitions' } as const, DEFAULT_DEFINITIONS as Definitions)
+const editing = atom({ plugin: 'adaptive-effort', key: 'editing' } as const, false)
 
 const PANE = 'adaptive-effort'
 const PANE_TITLE = 'Thinking effort'
 const STORE_THRESHOLDS = 'thresholds'
+const STORE_DEFINITIONS = 'definitions'
 const TITLE: Record<Raised, string> = { max: 'Max', xhigh: 'Extra high', high: 'High' }
 
 /** The weekly budget from the last response's 7-day limit (local; no request); `record` adds the reading. */
@@ -45,6 +55,19 @@ async function saveThresholds($: EngineInterface) {
   return t
 }
 
+/** One change to the user's definitions, applied to the current ones (two fields saved before a redraw both keep), now
+ *  and as the default of new sessions. */
+async function saveDefinitions($: EngineInterface, change: (d: Definitions) => Definitions) {
+  const d = await update($, definitions, change)
+  await $.store.set(STORE_DEFINITIONS, d)
+}
+
+/** Back to the default definitions, now and for new sessions. */
+async function resetDefinitions($: EngineInterface) {
+  await update($, definitions, () => DEFAULT_DEFINITIONS)
+  await $.store.delete(STORE_DEFINITIONS).catch(() => undefined)
+}
+
 /** Back to the standard thresholds, now and for new sessions. */
 async function resetThresholds($: EngineInterface) {
   await update($, thresholds, () => STANDARD)
@@ -58,6 +81,14 @@ async function saveChart($: EngineInterface, log: ChartLog, id?: string) {
   if (key !== undefined && log.buckets.length > 0) await $.store.set(STORE_CHART + key, log).catch(() => undefined)
 }
 
+// Operator 2026-10-16: "instead write 4 words general definition": one short line per level card.
+const SUMMARY: Record<Raised | 'medium', string> = {
+  max: 'Hard-to-undo or unexplained problems',
+  xhigh: 'Repeated or surprising failures',
+  high: 'Many parts, many checks',
+  medium: 'Clear steps, easily undone',
+}
+const cardLine = (l: Raised, n: number) => (n === 0 ? SUMMARY[l] : `${SUMMARY[l]} · ${difficultyWord(n)}`)
 const describe = (t: Thresholds) => RAISED.map(l => `${l} ${difficultyWord(t[l])}`).join(', ')
 const fmt = (n: number) => (Math.round(n * 10) / 10).toString()
 const mins = (ms: number) => Math.round(ms / 60_000)
@@ -68,6 +99,7 @@ export const register: Register = on => {
   let fresh = false
   // The thresholds Claude last read; a change during a turn reaches Claude on the next tool result.
   let delivered: Thresholds = STANDARD
+  let deliveredDefinitions: Definitions = DEFAULT_DEFINITIONS
   // When this session's chart was last saved; saved at most once a minute and at the end, so it costs little.
   let savedAt = 0
 
@@ -81,18 +113,22 @@ export const register: Register = on => {
     await update($, saved, () => s)
     await update($, thresholds, () => s)
     delivered = s
+    // The user's definitions, saved as the default of every session; with none saved, the defaults.
+    const d = validDefinitions(await $.store.get(STORE_DEFINITIONS).catch(() => undefined)) ?? DEFAULT_DEFINITIONS
+    await update($, definitions, () => d)
+    deliveredDefinitions = d
     // The chart this session saved before an app restart, and the saved charts that are spent, deleted.
     const now = await $.clock.now()
     const id = await $.session.id().catch(() => undefined)
     const back = id === undefined ? undefined : restored(await $.store.get(STORE_CHART + id).catch(() => undefined), now)
     // A plugin reload runs this too, with the chart in memory ahead of the save: merged, never replaced.
     if (back !== undefined && back.buckets.length > 0) await update($, chart, l => merged(l, back))
-    // Keys this build does not own go too: only the thresholds and the charts are its own.
+    // Keys this build does not own go too: only the thresholds, the definitions and the charts are its own.
     const all: [string, unknown][] = []
     for (const k of await $.store.keys().catch(() => [] as string[])) {
       all.push([k, k.startsWith(STORE_CHART) ? await $.store.get(k).catch(() => undefined) : undefined])
     }
-    for (const k of stale(all, now, [STORE_THRESHOLDS])) await $.store.delete(k).catch(() => undefined)
+    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS])) await $.store.delete(k).catch(() => undefined)
     // A session with nothing that draws a pane refuses the open; the controls still work through the command.
     void $.ui.open({ id: PANE, title: PANE_TITLE }).catch(() => undefined)
     return next(e)
@@ -130,17 +166,17 @@ export const register: Register = on => {
     if (word === 'save') return { text: `adaptive-effort: thresholds ${describe(await saveThresholds($))} saved as the default of new sessions.` }
     if (word === 'reset') {
       await resetThresholds($)
-      return { text: 'adaptive-effort: thresholds back to standard, now and for new sessions.' }
+      return { text: 'adaptive-effort: thresholds back to the defaults, now and for new sessions.' }
     }
     const now = await $.clock.now()
     const h = await read($, hold)
     const t = await read($, thresholds)
     const b = await budget($, now, false)
-    const r = levelRules(countsIn(t, overBudget(b)))
+    const r = levelRules(countsIn(t, overBudget(b)), await read($, definitions))
     const answer = h.answer
       ? `Claude answered EFFORT=${LEVELS[h.answer.level]} ${mins(now - h.answer.at)} min ago; it holds until Claude answers again.`
       : 'Claude has not answered EFFORT yet: medium.'
-    const rules = RAISED.map(l => `${l} (${difficultyWord(t[l])}): ${r[l].join('; ')}`).join('\n')
+    const rules = DEFINED.map(l => `${l}${l === 'medium' ? '' : ` (${difficultyWord(t[l])})`}: ${r[l].map(ruleText).join('; ')}`).join('\n')
     const week = !b
       ? 'Weekly budget: no 7-day reading yet, no cap.'
       : `Weekly budget: ${b.used}% used, ${fmt(b.left)}% left over ${fmt(b.hoursLeft)} h, so ${fmt(b.allowed * 24)}% a day allowed; ` +
@@ -161,7 +197,8 @@ export const register: Register = on => {
   })
 
   // How the pane says Auto works: a press changes the conditions, and the effort follows when Claude answers by them.
-  const EXPLAIN = 'Claude picks the first level whose conditions match the work. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
+  const SETTINGS_EXPLAIN = `The conditions Claude reads for each level, for code work and for other work. {n} is the count Easier and Harder move, {nth} the same as 3rd, 4th. Enter saves a field (up to ${DEFINITION_MAX} characters) for every session.`
+  const EXPLAIN = 'Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
   // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
   const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
   const WARN = '#E8A33D'
@@ -170,8 +207,9 @@ export const register: Register = on => {
   // Grey, not white, for the pane's text: easier on the eye.
   const GRAY = '#B4B2AC'
 
-  // The controls: Auto decides; per level, the user sets how hard that level is to reach. One card per level, each
-  // condition on its own line. Below them the chart of this session's output tokens and a table of the levels used.
+  // The controls: Auto decides; per level, the user sets how hard that level is to reach. One card per level, with no
+  // conditions printed; Settings edits them. Below them the chart of this session's output tokens and a table of the
+  // levels used.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
@@ -181,7 +219,42 @@ export const register: Register = on => {
     const at = await $.clock.now()
     const b = await budget($, at, false)
     const over = overBudget(b)
-    const r = levelRules(countsIn(t, over))
+    const edit = await read($, editing)
+    const d = await read($, definitions)
+    // Settings: each definition's code and general text in a field; Enter saves it as the default of every session. The
+    // mobile app draws no field, so it says where to edit.
+    const field = (l: DefinedLevel, i: number, side: 'code' | 'general') =>
+      'Input' in els ? (
+        <els.Input
+          key={`def-${l}-${i}-${side}`}
+          label={side === 'code' ? 'Code: ' : 'General: '}
+          value={d[l][i][side]}
+          submitLabel="save"
+          onSubmit={value => void saveDefinitions($, cur => withDefinition(cur, l, i, side, value))}
+        />
+      ) : (
+        <Text key={`def-${l}-${i}-${side}`} dimColor>{`${side === 'code' ? 'Code' : 'General'}: ${d[l][i][side]}`}</Text>
+      )
+    const settings = !edit ? null : (
+      <Box key="definitions" flexDirection="column" gap={1}>
+        {DEFINED.map(l => (
+          <Box key={`defs-${l}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+            <Text bold color={GRAY} backgroundColor={CARD_PILL}>{` ${l === 'medium' ? 'Medium' : TITLE[l]} `}</Text>
+            {d[l].map((_, i) => (
+              <Box key={`defs-${l}-${i}`} flexDirection="column">
+                {field(l, i, 'code')}
+                {field(l, i, 'general')}
+              </Box>
+            ))}
+          </Box>
+        ))}
+        {'Input' in els ? null : <Text dimColor>Definitions are edited on desktop or in the terminal.</Text>}
+        <Box flexDirection="row" gap={1}>
+          <Button key="definitions-reset" label="Reset definitions to default" onPress={() => resetDefinitions($)} />
+        </Box>
+        <Text dimColor>{sameDefinitions(d, DEFAULT_DEFINITIONS) ? 'Definitions: default' : 'Definitions: your own, saved for new sessions'}</Text>
+      </Box>
+    )
     const v = chartView(await read($, chart), at)
     // The chart drawn in a frame of fixed size where the surface draws Svg; the terminal gets text rows.
     const drawn =
@@ -193,40 +266,43 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column" gap={1}>
         <Box flexDirection="column">
-          <Box flexDirection="row" alignItems="center" gap={1}>
-            <Text bold color={GRAY}>Effort now</Text>
-            <Text bold color={PILL_TEXT[now]} backgroundColor={COLOR[now]}>{` ${levelName(now)} `}</Text>
+          <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+            <Box flexDirection="row" alignItems="center" gap={1}>
+              <Text bold color={GRAY}>Effort now</Text>
+              <Text bold color={PILL_TEXT[now]} backgroundColor={COLOR[now]}>{` ${levelName(now)} `}</Text>
+            </Box>
+            <Button key="settings" label={edit ? 'Done' : 'Settings'} onPress={() => update($, editing, x => !x)} />
           </Box>
-          <Text dimColor>{EXPLAIN}</Text>
+          <Text dimColor>{edit ? SETTINGS_EXPLAIN : EXPLAIN}</Text>
         </Box>
-        {RAISED.map(l => (
+        {edit ? settings : null}
+        {edit ? null : RAISED.map(l => (
           <Box key={`level-${l}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
             <Box flexDirection="row" alignItems="center" justifyContent="space-between">
               <Box flexDirection="row" alignItems="center" gap={1}>
                 <Text bold color={GRAY} backgroundColor={CARD_PILL}>{` ${TITLE[l]} `}</Text>
-                <Text dimColor>{difficultyWord(t[l])}</Text>
+                <Text dimColor>{cardLine(l, t[l])}</Text>
               </Box>
               <Box flexDirection="row">
                 <Button key={`${l}-easier`} label="Easier" onPress={() => update($, thresholds, x => stepped(x, l, -1))} />
                 <Button key={`${l}-harder`} label="Harder" onPress={() => update($, thresholds, x => stepped(x, l, 1))} />
               </Box>
             </Box>
-            {r[l].map((c, i) => (
-              <Text key={`${l}-c${i}`} dimColor>{`• ${c}`}</Text>
-            ))}
           </Box>
         ))}
-        <Box flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
-          <Text bold color={GRAY} backgroundColor={CARD_PILL}> Medium </Text>
-          <Text dimColor>everything else</Text>
-        </Box>
-        {over ? <Text color={WARN}>{`⚠ Weekly usage ${b?.used}%, over budget: every count above is one higher than set.`}</Text> : null}
+        {edit ? null : (
+          <Box flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
+            <Text bold color={GRAY} backgroundColor={CARD_PILL}> Medium </Text>
+            <Text dimColor>{SUMMARY.medium}</Text>
+          </Box>
+        )}
+        {over ? <Text color={WARN}>{`⚠ ${b?.used}% of this week's limit is used, faster than the week allows. So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
         <Box flexDirection="column">
           <Box flexDirection="row" gap={1}>
             <Button key="save" label="Save as default" hotkey="s" variant="primary" onPress={() => saveThresholds($)} />
-            <Button key="reset" label="Reset to standard" hotkey="r" onPress={() => resetThresholds($)} />
+            <Button key="reset" label="Reset to default" hotkey="r" onPress={() => resetThresholds($)} />
           </Box>
-          <Text dimColor>{`Default for new sessions: ${isStandard(s) ? 'standard' : describe(s)}${sameThresholds(t, s) ? '' : ' (current settings not saved)'}`}</Text>
+          <Text dimColor>{`Default for new sessions: ${isStandard(s) ? 'the defaults' : describe(s)}${sameThresholds(t, s) ? '' : ' (current settings not saved)'}`}</Text>
         </Box>
         <Text bold color={GRAY}>{chartTitle(v)}</Text>
         {v.bars.length === 0 ? (
@@ -259,7 +335,11 @@ export const register: Register = on => {
     if (!(await read($, enabled))) return next(e)
     const t = await read($, thresholds)
     delivered = t
-    const line = rulesLine(t, await budget($, await $.clock.now(), false))
+    const now = await $.clock.now()
+    // The usage goes with the rules, so Claude weighs the cost before it answers.
+    const d = await read($, definitions)
+    deliveredDefinitions = d
+    const line = rulesLine(t, await budget($, now, false), lastHourUse(await read($, chart), now), d)
     return next({ ...e, context: [...(e.context ?? []), line] })
   })
 
@@ -282,12 +362,14 @@ export const register: Register = on => {
           await update($, hold, s => ({ ...s, answer: { level: lvl, at } }))
         }
       }
-      // The user changed a threshold during this turn: the new thresholds reach Claude now, once.
+      // The user changed a threshold or a definition during this turn: the new rules reach Claude now, once.
       const t = await read($, thresholds)
-      if (!sameThresholds(t, delivered)) {
+      const d = await read($, definitions)
+      if (!sameThresholds(t, delivered) || !sameDefinitions(d, deliveredDefinitions)) {
         delivered = t
-        const line = rulesLine(t, await budget($, await $.clock.now(), false))
-        extra.push(`The thresholds changed. ${line} Answer EFFORT again by these rules.`)
+        deliveredDefinitions = d
+        const line = rulesLine(t, await budget($, await $.clock.now(), false), undefined, d)
+        extra.push(`The rules changed. ${line} Answer EFFORT again by these rules.`)
       }
     }
     // Over half the week's limit, a native subagent is flagged as not preferred; never blocked.

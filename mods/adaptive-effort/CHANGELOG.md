@@ -3,6 +3,28 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.1.0 (2026-10-16)
+
+Claude weighs the cost before it picks a level.
+
+- Beside every prompt, the line now shows your weekly usage (used, left, hours left, allowed per day against spent per
+  day) and this session's calls and output tokens of the last hour, by level.
+- One cost rule for the pace you are on: faster than the week allows, the lower level when two fit; close to the pace,
+  the level the conditions name; with room, a higher level the conditions support is affordable. Usage never raises a
+  level the conditions do not support.
+- Generic project signals: no tests, production, security or payment code, a shared or public repository, or unread
+  code raise the answer one level, never to max on these alone.
+- Every condition now comes in a version for code work and one for any other work, in specific, countable words.
+- A **Settings** button beside "Effort now" lets you rewrite each condition (`{n}` for the count) and reset them to
+  the defaults; your texts are saved for every session. The level cards no longer print the conditions: each shows a
+  short definition of its level, and your setting only when you changed it. "Standard" now reads "default".
+- Where several levels fit, Claude chooses among them by the work and the usage; the pace gives a lean, not an order.
+- The recent spending rate is steadier: a weekly figure that has not moved yet no longer reads as zero spending, and a
+  single step no longer reads as a burst.
+- Tests: the usage figures and the lean per pace, the last hour's output by level, the line beside the prompt, both
+  versions of every condition with the counts in force, saved definitions read back only in their shape, Settings
+  saving, keeping and resetting definitions, and the rate from rises of the weekly figure.
+
 ## 1.0.2 (2026-10-16)
 
 Watch your usage live in the pane.
