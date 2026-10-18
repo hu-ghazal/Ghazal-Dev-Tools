@@ -50,7 +50,7 @@ declare module 'claude-code' {
       chart: ChartLog
       definitions: Record<'max' | 'xhigh' | 'high' | 'medium', { count?: string; shift?: number; code: string; general: string }[]>
       editing: boolean
-      split: { on: boolean; last?: { score: number; value: number; pass: boolean; at: number } }
+      split: { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } }
     }
   }
 }
