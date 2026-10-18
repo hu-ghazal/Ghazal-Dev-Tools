@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 640" width="800" height="640" role="img" aria-labelledby="t d">
+  <title id="t">Terminal Boost flow</title>
+  <desc id="d">Six stages from request to close: hold the words, declare first, do the work, check fresh, test the claims, close or name the gaps. A failed check returns to the work only with a stated cause and change.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8b949e"/>
+    </marker>
+    <style>
+      .box { rx: 12; }
+      .n { font: 700 15px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #ffffff; }
+      .h { font: 700 17px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #ffffff; }
+      .s { font: 400 13px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #f0f3f6; }
+      .l { font: 600 13px system-ui, -apple-system, "Segoe UI", sans-serif; fill: #8b949e; }
+      .line { stroke: #8b949e; stroke-width: 2; fill: none; }
+    </style>
+  </defs>
+
+  <text x="380" y="30" text-anchor="middle" class="l">REQUEST</text>
+  <path class="line" d="M380 38 V56" marker-end="url(#a)"/>
+
+  <rect x="150" y="60" width="460" height="64" rx="12" fill="#1f6feb"/>
+  <text x="178" y="88" class="n">1</text>
+  <text x="206" y="88" class="h">Hold the words</text>
+  <text x="206" y="110" class="s">the request, verbatim, as the outcomes to meet</text>
+  <path class="line" d="M380 124 V146" marker-end="url(#a)"/>
+
+  <rect x="150" y="150" width="460" height="64" rx="12" fill="#1f6feb"/>
+  <text x="178" y="178" class="n">2</text>
+  <text x="206" y="178" class="h">Declare first</text>
+  <text x="206" y="200" class="s">the design and its checks, before any work</text>
+  <path class="line" d="M380 214 V236" marker-end="url(#a)"/>
+
+  <rect x="150" y="240" width="460" height="64" rx="12" fill="#8250df"/>
+  <text x="178" y="268" class="n">3</text>
+  <text x="206" y="268" class="h">Do the work</text>
+  <text x="206" y="290" class="s">inside the declared boundary</text>
+  <path class="line" d="M380 304 V326" marker-end="url(#a)"/>
+
+  <rect x="150" y="330" width="460" height="64" rx="12" fill="#bf3989"/>
+  <text x="178" y="358" class="n">4</text>
+  <text x="206" y="358" class="h">Check fresh</text>
+  <text x="206" y="380" class="s">every declared check runs again, now</text>
+  <path class="line" d="M380 394 V416" marker-end="url(#a)"/>
+
+  <rect x="150" y="420" width="460" height="64" rx="12" fill="#bf3989"/>
+  <text x="178" y="448" class="n">5</text>
+  <text x="206" y="448" class="h">Test the claims</text>
+  <text x="206" y="470" class="s">each statement in the report against what ran</text>
+  <path class="line" d="M380 484 V506" marker-end="url(#a)"/>
+
+  <rect x="150" y="510" width="460" height="64" rx="12" fill="#1a7f37"/>
+  <text x="178" y="538" class="n">6</text>
+  <text x="206" y="538" class="h">Close or name the gaps</text>
+  <text x="206" y="560" class="s">done only when every outcome is met</text>
+  <path class="line" d="M380 574 V596" marker-end="url(#a)"/>
+  <text x="380" y="616" text-anchor="middle" class="l">VERIFIED CLOSE</text>
+
+  <path class="line" d="M610 362 H680 V272 H616" marker-end="url(#a)" stroke-dasharray="6 5"/>
+  <text x="688" y="312" class="l">check fails:</text>
+  <text x="688" y="330" class="l">cause and</text>
+  <text x="688" y="348" class="l">change first</text>
+</svg>

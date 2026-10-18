@@ -17,12 +17,14 @@ and how to test it. A tool is one of these kinds:
 | Skill | A written procedure an agent loads and follows for a kind of task |
 | Mod | A plugin that changes how the agent works: hooks, panes, status lines, commands |
 | MCP server | A server that gives an agent new tools |
+| Concept | A method described with its flow, with no code published |
 
 ### Tools
 
 | Tool | Kind | What it does |
 |---|---|---|
 | 🏎️ [adaptive-effort](adaptive-effort) | Claude Code mod | An automatic gearbox for Claude's thinking: Claude shifts its own reasoning effort by clear rules, and a pane makes each gear harder or easier to reach |
+| 🟩 [Terminal Boost](Terminal-Boost) | Concept | Finish what was asked and prove it with fresh evidence: the request held in its own words, checks declared first and run fresh at the close, every claim tested against what ran |
 
 ## Getting started
 
