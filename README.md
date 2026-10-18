@@ -17,7 +17,7 @@ and how to test it. A tool is one of these kinds:
 | Skill | A written procedure an agent loads and follows for a kind of task |
 | Mod | A plugin that changes how the agent works: hooks, panes, status lines, commands |
 | MCP server | A server that gives an agent new tools |
-| Concept | A method described with its flow, with no code published |
+| Concept | A method described with its flow |
 
 ### Tools
 

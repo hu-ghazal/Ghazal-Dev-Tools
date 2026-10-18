@@ -13,8 +13,6 @@ for code, documents, configuration or operations, with any agent and on any syst
   <img alt="Terminal Boost flow: hold the request's own words, declare the design and checks, do the work, run the checks fresh, test every claim against evidence, then close or name the gaps" src="assets/flow.svg" width="760">
 </p>
 
-> This page describes the concept only. The implementation is private and is not published here.
-
 ## Why it exists
 
 AI agents are fast, but the same failures keep coming back:
@@ -48,12 +46,7 @@ a hope. The rigour scales with the work: a small, clear job takes a light path, 
 - **Less waste.** No blind reruns and no work redone because the first attempt solved the wrong problem.
 - **Any agent, any system.** It depends on no particular agent, editor, model or host.
 
-## Status
-
-Terminal Boost is in daily use on the author's own work. This folder holds the concept and the flow only; there is no
-code to install here.
-
 ## Copyright
 
-Copyright (c) 2026 [hu-ghazal](https://github.com/hu-ghazal). The text and the diagram are covered by the repository's
-[PolyForm Noncommercial License 1.0.0](../LICENSE). The implementation is not published and is not licensed.
+Copyright (c) 2026 [hu-ghazal](https://github.com/hu-ghazal). Covered by the repository's
+[PolyForm Noncommercial License 1.0.0](../LICENSE).
