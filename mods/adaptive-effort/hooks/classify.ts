@@ -452,11 +452,15 @@ export function rulesLine(
 
 /**
  * Experimental split before Max, off by default. Claude adds a quick score out of ten to an answer of max, SPLIT=<0-10>:
- * how well a short plan would turn the work into clear pieces. The gate is plain arithmetic: SPLIT/10 x 0.9 over 0.7
- * passes, and the step is then sent at High to write the plan, the pieces after it at Medium. No model call.
+ * how well a short plan would turn the work into clear pieces. A score over the trigger passes, and the step is then
+ * sent at High to write the plan, the pieces after it at Medium. No model call.
  */
-export const SPLIT_FACTOR = 0.9
-export const SPLIT_PASS = 0.7
+/** Break to simple splits when the score is over the trigger: 7 by default, set from 1 to 9 in Settings. */
+export const SPLIT_TRIGGER = 7
+export const SPLIT_TRIGGER_MIN = 1
+export const SPLIT_TRIGGER_MAX = 9
+export const validTrigger = (v: unknown): number | undefined =>
+  typeof v === 'number' && Number.isInteger(v) && v >= SPLIT_TRIGGER_MIN && v <= SPLIT_TRIGGER_MAX ? v : undefined
 
 /** The last SPLIT=<0-10> on the first line of an echo; anything else (11, 8.5, 08, -1, XSPLIT=) is no score. */
 export function parseSplitAnswer(command: unknown): number | undefined {
@@ -475,16 +479,12 @@ export function parseSplitAnswer(command: unknown): number | undefined {
   return found
 }
 
-/** The gate: SPLIT/10 x 0.9, rounded to two places, passes over 0.7 (8 gives 0.72 and passes, 7 gives 0.63). */
-export function splitGate(score: number): { value: number; pass: boolean } {
-  const value = Math.round((score / 10) * SPLIT_FACTOR * 100) / 100
-  return { value, pass: value > SPLIT_PASS }
-}
+/** The gate: the score splits when it is over the trigger (at the default 7, 8 splits and 7 does not). */
+export const splitGate = (score: number, trigger = SPLIT_TRIGGER): { pass: boolean } => ({ pass: score > trigger })
 
-export const splitText = (score: number) => {
-  const g = splitGate(score)
-  return `split ${score}/10 x ${SPLIT_FACTOR} = ${g.value} ${g.pass ? '>' : 'not over'} ${SPLIT_PASS}`
-}
+export const splitText = (score: number, trigger = SPLIT_TRIGGER) =>
+  `split score ${score}/10 ${splitGate(score, trigger).pass ? 'over' : 'not over'} ${trigger}`
 
-export const SPLIT_RULE =
-  'adaptive-effort experimental split (on): when you answer EFFORT=max, add a quick score out of ten in the same echo, SPLIT=<0-10>: how well a short plan would turn the work into clear, separate pieces (10: clearly separable, 0: one judgment that cannot be split). Do not deliberate over it. adaptive-effort computes SPLIT/10 x 0.9; over 0.7 the step runs at High to write the plan, then answer EFFORT=medium for each piece, done in this conversation, not in subagents. Not over 0.7, or no SPLIT, Max stands.'
+export const splitRule = (trigger = SPLIT_TRIGGER) =>
+  'adaptive-effort experimental split (on): when you answer EFFORT=max, add a quick score out of ten in the same echo, SPLIT=<0-10>: how well a short plan would turn the work into clear, separate pieces (10: clearly separable, 0: one judgment that cannot be split). Do not deliberate over it. ' +
+  `A score over ${trigger} runs the step at High to write the plan, then answer EFFORT=medium for each piece, done in this conversation, not in subagents. ${trigger} or less, or no SPLIT, Max stands.`

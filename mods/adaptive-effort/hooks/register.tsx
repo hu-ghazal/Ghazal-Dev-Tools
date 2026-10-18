@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, SPLIT_RULE, parseSplitAnswer, splitGate, splitText } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -33,7 +33,7 @@ const chart = atom({ plugin: 'adaptive-effort', key: 'chart' } as const, EMPTY_C
 // their settings.
 const definitions = atom({ plugin: 'adaptive-effort', key: 'definitions' } as const, DEFAULT_DEFINITIONS as Definitions)
 // Experimental split before Max: off by default, saved for new sessions; the last gate result for the pane.
-const split = atom({ plugin: 'adaptive-effort', key: 'split' } as const, { on: false } as { on: boolean; last?: { score: number; value: number; pass: boolean; at: number } })
+const split = atom({ plugin: 'adaptive-effort', key: 'split' } as const, { on: false, trigger: SPLIT_TRIGGER } as { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } })
 const editing = atom({ plugin: 'adaptive-effort', key: 'editing' } as const, false)
 
 const PANE = 'adaptive-effort'
@@ -43,6 +43,7 @@ const STORE_DEFINITIONS = 'definitions'
 // On or off, kept for new sessions.
 const STORE_ENABLED = 'enabled'
 const STORE_SPLIT = 'split'
+const STORE_SPLIT_TRIGGER = 'split-trigger'
 const TITLE: Record<Raised, string> = { max: 'Max', xhigh: 'Extra high', high: 'High' }
 
 /** The weekly budget from the last response's 7-day limit (local; no request); `record` adds the reading. */
@@ -73,6 +74,18 @@ async function power($: EngineInterface, value: boolean) {
 async function setSplit($: EngineInterface, on: boolean) {
   await update($, split, x => ({ ...x, on }))
   await $.store.set(STORE_SPLIT, on).catch(() => undefined)
+}
+
+/** The Break to simple trigger, moved by one between 1 and 9, now and for new sessions. */
+async function setTrigger($: EngineInterface, by: number) {
+  const x = await update($, split, s => ({ ...s, trigger: Math.min(SPLIT_TRIGGER_MAX, Math.max(SPLIT_TRIGGER_MIN, s.trigger + by)) }))
+  await $.store.set(STORE_SPLIT_TRIGGER, x.trigger).catch(() => undefined)
+}
+
+/** The split rule beside the prompt while Break to simple is on, naming the trigger in force. */
+async function splitRuleNow($: EngineInterface): Promise<string | undefined> {
+  const s = await read($, split)
+  return s.on ? splitRule(s.trigger) : undefined
 }
 
 async function saveDefinitions($: EngineInterface, change: (d: Definitions) => Definitions) {
@@ -138,7 +151,8 @@ export const register: Register = on => {
     const isOn = (await $.store.get(STORE_ENABLED).catch(() => undefined)) !== false
     await update($, enabled, () => isOn)
     const splitOn = (await $.store.get(STORE_SPLIT).catch(() => undefined)) === true
-    await update($, split, x => ({ ...x, on: splitOn }))
+    const trigger = validTrigger(await $.store.get(STORE_SPLIT_TRIGGER).catch(() => undefined)) ?? SPLIT_TRIGGER
+    await update($, split, x => ({ ...x, on: splitOn, trigger }))
     // The chart this session saved before an app restart, and the saved charts that are spent, deleted.
     const now = await $.clock.now()
     const id = await $.session.id().catch(() => undefined)
@@ -150,7 +164,7 @@ export const register: Register = on => {
     for (const k of await $.store.keys().catch(() => [] as string[])) {
       all.push([k, k.startsWith(STORE_CHART) ? await $.store.get(k).catch(() => undefined) : undefined])
     }
-    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS, STORE_ENABLED, STORE_SPLIT])) await $.store.delete(k).catch(() => undefined)
+    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS, STORE_ENABLED, STORE_SPLIT, STORE_SPLIT_TRIGGER])) await $.store.delete(k).catch(() => undefined)
     // A session with nothing that draws a pane refuses the open; the controls still work through the command.
     void $.ui.open({ id: PANE, title: PANE_TITLE }).catch(() => undefined)
     return next(e)
@@ -216,7 +230,7 @@ export const register: Register = on => {
   // How the pane says Auto works: a press changes the conditions, and the effort follows when Claude answers by them.
   const SETTINGS_EXPLAIN = `The conditions Claude reads for each level, for code work and for other work. Write each in your own words. A number in a condition is its count: type another to change it; Easier, Harder and the weekly budget still move it. Enter saves a field (up to ${DEFINITION_MAX} characters) for every session.`
   const OFF_EXPLAIN = 'Off: Claude Code keeps its own effort, and nothing is added beside your prompts. Turn on lets Claude choose again. New sessions keep this choice.'
-  const SPLIT_EXPLAIN = 'Off by default. On, Claude adds a quick score out of ten when it answers Max: how well the work splits into clear pieces. Score/10 x 0.9 over 0.7 sends High to plan, then Medium for each piece; otherwise Max stands.'
+  const SPLIT_EXPLAIN = 'Off by default. On, Claude adds a quick score out of ten when it answers Max: how well the work splits into clear pieces. A score over the number above sends High to plan, then Medium for each piece; otherwise Max stands. Set the number with − and +; it is kept for new sessions.'
   const EXPLAIN = 'Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
   // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
   const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
@@ -264,6 +278,12 @@ export const register: Register = on => {
           <Box flexDirection="row" alignItems="center" gap={1}>
             <Button key="split" label={sp.on ? '☑' : '☐'} onPress={() => setSplit($, !sp.on)} />
             <Text bold color={YELLOW}>Break to simple (experimental)</Text>
+          </Box>
+          <Box flexDirection="row" alignItems="center" gap={1}>
+            <Text color={YELLOW}>Break to simple when the score is over</Text>
+            <Button key="split-down" label="−" onPress={() => setTrigger($, -1)} />
+            <Text key="split-trigger" bold color={YELLOW}>{String(sp.trigger)}</Text>
+            <Button key="split-up" label="+" onPress={() => setTrigger($, 1)} />
           </Box>
           <Text dimColor>{SPLIT_EXPLAIN}</Text>
         </Box>
@@ -333,7 +353,7 @@ export const register: Register = on => {
             <Text dimColor>{SUMMARY.medium}</Text>
           </Box>
         )}
-        {!edit && isOn && sp.on ? <Text dimColor>{`Break to simple (experimental) is on${sp.last ? `; last: ${splitText(sp.last.score)}, ${sp.last.pass ? 'High to plan' : 'Max stood'}` : '; no Max answer yet'}.`}</Text> : null}
+        {!edit && isOn && sp.on ? <Text dimColor>{`Break to simple (experimental) is on${sp.last ? `; last: ${splitText(sp.last.score, sp.trigger)}, ${sp.last.pass ? 'High to plan' : 'Max stood'}` : '; no Max answer yet'}.`}</Text> : null}
         {over ? <Text color={WARN}>{`⚠ ${b?.used}% of this week's limit is used, faster than the week allows. So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
         <Box flexDirection="column">
           <Box flexDirection="row" gap={1}>
@@ -378,7 +398,7 @@ export const register: Register = on => {
     const d = await read($, definitions)
     deliveredDefinitions = d
     const line = rulesLine(t, await budget($, now, false), lastHourUse(await read($, chart), now), d)
-    const rule = (await read($, split)).on ? [SPLIT_RULE] : []
+    const rule = [await splitRuleNow($)].filter((x): x is string => x !== undefined)
     return next({ ...e, context: [...(e.context ?? []), line, ...rule] })
   })
 
@@ -399,17 +419,17 @@ export const register: Register = on => {
         if (lvl !== undefined) {
           const at = await $.clock.now()
           let answered = lvl
-          // Experimental split: Claude's blind score out of ten, then the fixed gate SPLIT/10 x 0.9 over 0.7.
+          // Experimental split: Claude's blind score out of ten, then split when it is over the trigger.
           const sp = await read($, split)
           const score = sp.on && lvl === LEVELS.indexOf('max') ? parseSplitAnswer(ev.command ?? ev.input?.command) : undefined
           if (score !== undefined) {
-            const g = splitGate(score)
-            await update($, split, x => ({ ...x, last: { score, value: g.value, pass: g.pass, at } }))
+            const g = splitGate(score, sp.trigger)
+            await update($, split, x => ({ ...x, last: { score, pass: g.pass, at } }))
             if (g.pass) answered = LEVELS.indexOf('high')
             extra.push(
               g.pass
-                ? `adaptive-effort: ${splitText(score)}: split. This step runs at High: write the plan of the pieces, then answer EFFORT=medium and do each piece in this conversation, not in subagents.`
-                : `adaptive-effort: ${splitText(score)}: no split; Max stands.`,
+                ? `adaptive-effort: ${splitText(score, sp.trigger)}: split. This step runs at High: write the plan of the pieces, then answer EFFORT=medium and do each piece in this conversation, not in subagents.`
+                : `adaptive-effort: ${splitText(score, sp.trigger)}: no split; Max stands.`,
             )
           }
           await update($, hold, s => ({ ...s, answer: { level: answered, at } }))

@@ -3,6 +3,18 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.4.0 (2026-10-18)
+
+Break to simple, simpler and adjustable.
+
+- The gate is now the score itself: a score over the trigger splits, 7 by default. The score/10 × 0.9 over 0.7
+  arithmetic is gone; at the default the result is the same (8 and up split).
+- **Settings** has a new line under **Break to simple (experimental)**: "Break to simple when the score is over", with
+  **−** and **+** to set the trigger from 1 to 9. It is kept for new sessions, and the rule beside the prompt and the
+  notes name the trigger in force.
+- Tests: the gate at the default and at a lower trigger, the trigger moved from Settings and its bounds, the effort sent
+  with it, and the trigger kept for a new session.
+
 ## 1.3.1 (2026-10-16)
 
 Leaner: the mod keeps to effort.
