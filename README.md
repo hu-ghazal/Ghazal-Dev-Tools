@@ -9,19 +9,20 @@ was not needed, or reported work as done when it was not. Use what helps you, im
 
 ## What is inside
 
-| Folder | What it holds |
-|---|---|
-| `skills/` | Skills: written procedures an agent loads and follows for a kind of task |
-| `mods/` | Mods and plugins that change how the agent works: hooks, panes, status lines, commands |
-| `mcp-servers/` | MCP servers that give an agent new tools |
+Every tool has its own folder at the top of the repository, with a README that says what it does, how to install it
+and how to test it. A tool is one of these kinds:
 
-Each tool has its own folder with a README that says what it does, how to install it and how to test it.
+| Kind | What it is |
+|---|---|
+| Skill | A written procedure an agent loads and follows for a kind of task |
+| Mod | A plugin that changes how the agent works: hooks, panes, status lines, commands |
+| MCP server | A server that gives an agent new tools |
 
 ### Tools
 
 | Tool | Kind | What it does |
 |---|---|---|
-| 🏎️ [adaptive-effort](mods/adaptive-effort) | Claude Code mod | An automatic gearbox for Claude's thinking: Claude shifts its own reasoning effort by clear rules, and a pane makes each gear harder or easier to reach |
+| 🏎️ [adaptive-effort](adaptive-effort) | Claude Code mod | An automatic gearbox for Claude's thinking: Claude shifts its own reasoning effort by clear rules, and a pane makes each gear harder or easier to reach |
 
 ## Getting started
 
