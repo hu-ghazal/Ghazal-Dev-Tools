@@ -6,7 +6,7 @@
 
 **Finish what was asked, prove it with fresh evidence, and never call work done when it is not.**
 
-Terminal Boost is a discipline for carrying any piece of work from the request to a verified close. It is domain
+Terminal Boost is a discipline for carrying any work from the request to a verified close. It is domain
 agnostic: software, operations, data, documents, analysis or design, done by a person, a team or an AI agent.
 
 <p align="center">
@@ -29,12 +29,12 @@ Terminal Boost puts a fixed path in front of the work so each of these is caught
 
 | Stage | What happens | What it prevents |
 |---|---|---|
-| 1. **Hold the words** | The request is kept in the requester's own words, as the outcomes the work must meet, with the boundary of the work named | Drift, and an easier task replacing the real one |
+| 1. **Hold the words** | The request is kept in the requester's own words, as the results the work must deliver, with the boundary of the work named | Drift, and an easier task replacing the real one |
 | 2. **Declare first** | The intended design and the checks that will prove it are stated before any work starts | Proof invented after the fact to fit the result |
 | 3. **Do the work** | The work is done inside its declared boundary | Unrelated changes slipping in beside the real one |
 | 4. **Check fresh** | Every declared check runs again at the close, on the work as it is now | Stale or reported results counting as proof |
 | 5. **Test the claims** | The closing report's own statements are held against what actually ran | Success, delivery or verification claims nothing supports |
-| 6. **Close or name the gaps** | The work closes only when every outcome is met; otherwise each open gap is named | Partial work presented as finished |
+| 6. **Close or name the gaps** | The work closes only when every requested result is delivered; otherwise each open gap is named | Partial work presented as finished |
 
 A failed check may run again only with a stated cause and a stated change, so every retry is an experiment rather than
 a hope. The rigour scales with the work: a small, clear job takes a light path, and complex work gets a stricter one.
@@ -49,7 +49,7 @@ The same six stages fit any unit of work, at any size:
 | **Agentic work** | An AI agent, or several, acting on a request with its own steps and tools | Every step stays inside the request, and the agent's "done" is proved, not reported |
 | **A workflow** | A set of steps or roles that hand work to each other | Each hand-off carries what was asked and what was proved, so nothing is lost or invented between steps |
 | **A pipeline** | An end-to-end process, from the first input to the delivered output | The delivered output is checked against the original request, not only each stage on its own |
-| **A project** | Many tasks toward one goal | Each piece closes on its own evidence, and open gaps stay visible until they are closed |
+| **A project** | Many tasks toward one goal | Each request closes on its own evidence, and open gaps stay visible until they are closed |
 
 ## Who it is for
 
@@ -63,7 +63,7 @@ The same request, closed twice.
 
 | | Without Terminal Boost | With Terminal Boost |
 |---|---|---|
-| **A software fix** | "Fixed, all tests pass." The tests ran before the last change, and one of the three reported cases was never touched. | The close lists the three cases from the request, the checks run just now on the final version, and names the one case still open. |
+| **A software fix** | "Fixed, all tests pass." The tests ran before the last change, and one of the three reported problems was never touched. | The close lists the three problems from the request, the checks run just now on the final version, and names the one problem still open. |
 | **A monthly report** | "Report ready." The figures came from last month's extract, and the section the manager asked for is missing. | The close shows the requested sections, the figures re-checked against today's source, and the one source that could not be reached. |
 | **A system change** | "Migration done." The data was copied, but nobody compared it afterwards. | The close shows the counts and samples compared after the copy, and a rollback named before the change began. |
 | **An AI agent's task** | "All done!" The agent changed four files, two of them outside the request, and never ran the checks it described. | The close shows the work stayed inside the request, the checks ran on the final result, and the one claim without proof is withdrawn. |
@@ -72,7 +72,7 @@ The same request, closed twice.
 
 ## What you get
 
-- **Answers you can trust.** A closed piece of work means its checks ran and passed at the close.
+- **Answers you can trust.** A closed request means its checks ran and passed at the close.
 - **Visible gaps.** What is not finished is named, not hidden in a confident summary.
 - **Less waste.** No blind retries and no work redone because the first attempt solved the wrong problem.
 - **Any field, any worker.** People, teams, AI agents, workflows and pipelines follow the same path.
@@ -86,7 +86,7 @@ right version, and that the summary says only what they showed.
 
 **Is it slow?** A small, clear job takes a light path. The stricter path is kept for work where a mistake costs more.
 
-**What does a piece of work need?** A request someone can quote, and at least one thing that can be checked.
+**What does a request need?** Words someone can quote, and at least one thing that can be checked.
 
 ## Copyright
 
