@@ -3,6 +3,22 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.5.0 (2026-10-19)
+
+Break to simple at the trigger, a clearer budget warning, and fast mode at Medium.
+
+- **Break to simple** now splits at a score of the trigger **or more**: 7 or more at the default 7. The Settings line
+  reads "Break to simple at a score of at least", set from 1 to 10. A trigger saved by 1.4.0 meant "over", so it is
+  not carried over and the trigger starts again at 7.
+- **The budget warning** names the rates: what you are spending a day, what the week allows a day, and the week's use
+  so far.
+- **Fast mode at Medium**, a new box in **Settings**, unchecked by default. Checked, a note beside the tool result asks
+  Claude to switch fast mode on while the effort is Medium and weekly usage is under budget, and off at any other effort
+  or over budget. A note comes only when the wanted state changes. The Medium card reads **Medium-Fast** in green while
+  fast mode is on.
+- Tests: the gate at its new edges, the trigger from 1 to 10, the fast-mode rule, its notes, its Settings box and its
+  setting kept for new sessions.
+
 ## 1.4.0 (2026-10-18)
 
 Break to simple, simpler and adjustable.

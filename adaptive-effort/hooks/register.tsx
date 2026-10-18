@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, perDay } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -34,6 +34,8 @@ const chart = atom({ plugin: 'adaptive-effort', key: 'chart' } as const, EMPTY_C
 const definitions = atom({ plugin: 'adaptive-effort', key: 'definitions' } as const, DEFAULT_DEFINITIONS as Definitions)
 // Experimental split before Max: off by default, saved for new sessions; the last gate result for the pane.
 const split = atom({ plugin: 'adaptive-effort', key: 'split' } as const, { on: false, trigger: SPLIT_TRIGGER } as { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } })
+// Fast mode at Medium: unchecked by default, saved for new sessions; told is what the notes last asked this session.
+const fast = atom({ plugin: 'adaptive-effort', key: 'fast' } as const, { on: false } as { on: boolean; told?: boolean })
 const editing = atom({ plugin: 'adaptive-effort', key: 'editing' } as const, false)
 
 const PANE = 'adaptive-effort'
@@ -43,7 +45,8 @@ const STORE_DEFINITIONS = 'definitions'
 // On or off, kept for new sessions.
 const STORE_ENABLED = 'enabled'
 const STORE_SPLIT = 'split'
-const STORE_SPLIT_TRIGGER = 'split-trigger'
+const STORE_SPLIT_TRIGGER = 'split-min'
+const STORE_FAST = 'fast-medium'
 const TITLE: Record<Raised, string> = { max: 'Max', xhigh: 'Extra high', high: 'High' }
 
 /** The weekly budget from the last response's 7-day limit (local; no request); `record` adds the reading. */
@@ -76,10 +79,16 @@ async function setSplit($: EngineInterface, on: boolean) {
   await $.store.set(STORE_SPLIT, on).catch(() => undefined)
 }
 
-/** The Break to simple trigger, moved by one between 1 and 9, now and for new sessions. */
+/** The Break to simple trigger, moved by one between 1 and 10, now and for new sessions. */
 async function setTrigger($: EngineInterface, by: number) {
   const x = await update($, split, s => ({ ...s, trigger: Math.min(SPLIT_TRIGGER_MAX, Math.max(SPLIT_TRIGGER_MIN, s.trigger + by)) }))
   await $.store.set(STORE_SPLIT_TRIGGER, x.trigger).catch(() => undefined)
+}
+
+/** Fast mode at Medium on or off, now and for new sessions. */
+async function setFast($: EngineInterface, on: boolean) {
+  await update($, fast, x => ({ ...x, on }))
+  await $.store.set(STORE_FAST, on).catch(() => undefined)
 }
 
 /** The split rule beside the prompt while Break to simple is on, naming the trigger in force. */
@@ -153,6 +162,9 @@ export const register: Register = on => {
     const splitOn = (await $.store.get(STORE_SPLIT).catch(() => undefined)) === true
     const trigger = validTrigger(await $.store.get(STORE_SPLIT_TRIGGER).catch(() => undefined)) ?? SPLIT_TRIGGER
     await update($, split, x => ({ ...x, on: splitOn, trigger }))
+    const fastOn = (await $.store.get(STORE_FAST).catch(() => undefined)) === true
+    // A reload keeps what the last note asked, so the Medium-Fast card stays while fast mode is on.
+    await update($, fast, x => ({ ...x, on: fastOn }))
     // The chart this session saved before an app restart, and the saved charts that are spent, deleted.
     const now = await $.clock.now()
     const id = await $.session.id().catch(() => undefined)
@@ -164,7 +176,7 @@ export const register: Register = on => {
     for (const k of await $.store.keys().catch(() => [] as string[])) {
       all.push([k, k.startsWith(STORE_CHART) ? await $.store.get(k).catch(() => undefined) : undefined])
     }
-    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS, STORE_ENABLED, STORE_SPLIT, STORE_SPLIT_TRIGGER])) await $.store.delete(k).catch(() => undefined)
+    for (const k of stale(all, now, [STORE_THRESHOLDS, STORE_DEFINITIONS, STORE_ENABLED, STORE_SPLIT, STORE_SPLIT_TRIGGER, STORE_FAST])) await $.store.delete(k).catch(() => undefined)
     // A session with nothing that draws a pane refuses the open; the controls still work through the command.
     void $.ui.open({ id: PANE, title: PANE_TITLE }).catch(() => undefined)
     return next(e)
@@ -230,7 +242,8 @@ export const register: Register = on => {
   // How the pane says Auto works: a press changes the conditions, and the effort follows when Claude answers by them.
   const SETTINGS_EXPLAIN = `The conditions Claude reads for each level, for code work and for other work. Write each in your own words. A number in a condition is its count: type another to change it; Easier, Harder and the weekly budget still move it. Enter saves a field (up to ${DEFINITION_MAX} characters) for every session.`
   const OFF_EXPLAIN = 'Off: Claude Code keeps its own effort, and nothing is added beside your prompts. Turn on lets Claude choose again. New sessions keep this choice.'
-  const SPLIT_EXPLAIN = 'Off by default. On, Claude adds a quick score out of ten when it answers Max: how well the work splits into clear pieces. A score over the number above sends High to plan, then Medium for each piece; otherwise Max stands. Set the number with − and +; it is kept for new sessions.'
+  const SPLIT_EXPLAIN = 'Off by default. On, Claude adds a quick score out of ten when it answers Max: how well the work splits into clear pieces. A score of the number above or more sends High to plan, then Medium for each piece; otherwise Max stands. Set the number with − and +; it is kept for new sessions.'
+  const FAST_EXPLAIN = 'Off by default. On, Claude switches fast mode on while the effort is Medium and weekly usage is under budget, and off at any other effort or over budget. Fast mode is billed at fast-mode rates; it switches only where the desktop app offers it. Kept for new sessions.'
   const EXPLAIN = 'Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
   // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
   const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
@@ -257,6 +270,7 @@ export const register: Register = on => {
     const d = await read($, definitions)
     const isOn = await read($, enabled)
     const sp = await read($, split)
+    const fm = await read($, fast)
     const counts = countsIn(t, over)
     // Settings: each definition's code and general text in a field; Enter saves it as the default of every session. The
     // mobile app draws no field, so it says where to edit.
@@ -280,12 +294,19 @@ export const register: Register = on => {
             <Text bold color={YELLOW}>Break to simple (experimental)</Text>
           </Box>
           <Box flexDirection="row" alignItems="center" gap={1}>
-            <Text color={YELLOW}>Break to simple when the score is over</Text>
+            <Text color={YELLOW}>Break to simple at a score of at least</Text>
             <Button key="split-down" label="−" onPress={() => setTrigger($, -1)} />
             <Text key="split-trigger" bold color={YELLOW}>{String(sp.trigger)}</Text>
             <Button key="split-up" label="+" onPress={() => setTrigger($, 1)} />
           </Box>
           <Text dimColor>{SPLIT_EXPLAIN}</Text>
+        </Box>
+        <Box key="fast" flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+          <Box flexDirection="row" alignItems="center" gap={1}>
+            <Button key="fast" label={fm.on ? '☑' : '☐'} onPress={() => setFast($, !fm.on)} />
+            <Text bold color={YELLOW}>Fast mode at Medium</Text>
+          </Box>
+          <Text dimColor>{FAST_EXPLAIN}</Text>
         </Box>
         {DEFINED.map(l => (
           <Box key={`defs-${l}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
@@ -349,12 +370,12 @@ export const register: Register = on => {
         ))}
         {edit ? null : (
           <Box flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
-            <Text bold color={GRAY} backgroundColor={CARD_PILL}> Medium </Text>
+            <Text bold color={fm.on && fm.told ? '#3DDC84' : GRAY} backgroundColor={CARD_PILL}>{fm.on && fm.told ? ' Medium-Fast ' : ' Medium '}</Text>
             <Text dimColor>{SUMMARY.medium}</Text>
           </Box>
         )}
         {!edit && isOn && sp.on ? <Text dimColor>{`Break to simple (experimental) is on${sp.last ? `; last: ${splitText(sp.last.score, sp.trigger)}, ${sp.last.pass ? 'High to plan' : 'Max stood'}` : '; no Max answer yet'}.`}</Text> : null}
-        {over ? <Text color={WARN}>{`⚠ ${b?.used}% of this week's limit is used, faster than the week allows. So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
+        {over ? <Text color={WARN}>{`⚠ Spending ${b ? perDay(b.burn) : '?'}% a day, over the ${b ? perDay(b.allowed) : '?'}% a day the week allows (${b?.used}% used so far). So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
         <Box flexDirection="column">
           <Box flexDirection="row" gap={1}>
             <Button key="save" label="Save as default" hotkey="s" variant="primary" onPress={() => saveThresholds($)} />
@@ -433,6 +454,14 @@ export const register: Register = on => {
             )
           }
           await update($, hold, s => ({ ...s, answer: { level: answered, at } }))
+          // Fast mode at Medium: a note only when the wanted state differs from the last one asked; unticked after an on,
+          // one off note.
+          const fm = await read($, fast)
+          const want = fm.on ? fastWanted(answered, await budget($, at, false)) : fm.told === true ? false : undefined
+          if (want !== undefined && want !== fm.told) {
+            await update($, fast, x => ({ ...x, told: want }))
+            extra.push(fastNote(want))
+          }
         }
       }
       // The user changed a threshold or a definition during this turn: the new rules reach Claude now, once.

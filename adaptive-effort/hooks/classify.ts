@@ -384,7 +384,7 @@ export function levelRules(c: Counts, d: Definitions = DEFAULT_DEFINITIONS): Rec
 }
 
 /** A Budget's rate as a share of the week per day, to one decimal. */
-const perDay = (x: number) => (Math.round(x * 240) / 10).toString()
+export const perDay = (x: number) => (Math.round(x * 240) / 10).toString()
 /** The budget pays this share of the current spend or more: room for a higher level. */
 export const ROOM_H = 1.5
 
@@ -452,13 +452,13 @@ export function rulesLine(
 
 /**
  * Experimental split before Max, off by default. Claude adds a quick score out of ten to an answer of max, SPLIT=<0-10>:
- * how well a short plan would turn the work into clear pieces. A score over the trigger passes, and the step is then
+ * how well a short plan would turn the work into clear pieces. A score of the trigger or more passes, and the step is then
  * sent at High to write the plan, the pieces after it at Medium. No model call.
  */
-/** Break to simple splits when the score is over the trigger: 7 by default, set from 1 to 9 in Settings. */
+/** Break to simple splits at a score of the trigger or more: 7 by default, set from 1 to 10 in Settings. */
 export const SPLIT_TRIGGER = 7
 export const SPLIT_TRIGGER_MIN = 1
-export const SPLIT_TRIGGER_MAX = 9
+export const SPLIT_TRIGGER_MAX = 10
 export const validTrigger = (v: unknown): number | undefined =>
   typeof v === 'number' && Number.isInteger(v) && v >= SPLIT_TRIGGER_MIN && v <= SPLIT_TRIGGER_MAX ? v : undefined
 
@@ -479,12 +479,25 @@ export function parseSplitAnswer(command: unknown): number | undefined {
   return found
 }
 
-/** The gate: the score splits when it is over the trigger (at the default 7, 8 splits and 7 does not). */
-export const splitGate = (score: number, trigger = SPLIT_TRIGGER): { pass: boolean } => ({ pass: score > trigger })
+/** The gate: the score splits at the trigger or more (at the default 7, 7 splits and 6 does not). */
+export const splitGate = (score: number, trigger = SPLIT_TRIGGER): { pass: boolean } => ({ pass: score >= trigger })
 
 export const splitText = (score: number, trigger = SPLIT_TRIGGER) =>
-  `split score ${score}/10 ${splitGate(score, trigger).pass ? 'over' : 'not over'} ${trigger}`
+  `split score ${score}/10 ${splitGate(score, trigger).pass ? 'at or over' : 'under'} ${trigger}`
 
 export const splitRule = (trigger = SPLIT_TRIGGER) =>
   'adaptive-effort experimental split (on): when you answer EFFORT=max, add a quick score out of ten in the same echo, SPLIT=<0-10>: how well a short plan would turn the work into clear, separate pieces (10: clearly separable, 0: one judgment that cannot be split). Do not deliberate over it. ' +
-  `A score over ${trigger} runs the step at High to write the plan, then answer EFFORT=medium for each piece, done in this conversation, not in subagents. ${trigger} or less, or no SPLIT, Max stands.`
+  `A score of ${trigger} or more runs the step at High to write the plan, then answer EFFORT=medium for each piece, done in this conversation, not in subagents. Under ${trigger}, or no SPLIT, Max stands.`
+
+/**
+ * Fast mode at Medium, unchecked by default. The mod has no call that sets fast mode, so a note asks Claude to switch
+ * it through the desktop app's session tool. Fast only at Medium and only while a 7-day reading shows the week under
+ * budget; no reading stays off.
+ */
+export const fastWanted = (level: number, b: Budget | undefined): boolean =>
+  level === LEVELS.indexOf('medium') && b !== undefined && !overBudget(b)
+
+export const fastNote = (on: boolean) =>
+  on
+    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now.'
+    : 'adaptive-effort: fast mode off (not Medium, or weekly usage over budget): call set_session_fast_mode with session_id "self" and enabled false now.'

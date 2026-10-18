@@ -39,6 +39,7 @@ shifting smooth and the most expensive gear short.
 - ⏱️ **Smooth shifting.** At least 60 seconds between changes, so the effort never flickers.
 - 🛑 **Rev limiter on max.** Ten minutes in a row at most, then back to medium until your next prompt.
 - 💰 **Budget aware.** When your weekly usage runs ahead of the week, every gear gets one step harder to reach.
+- ⚡ **Fast mode at Medium.** An option to run Medium in fast mode while your week is under budget.
 - 🧠 **Weighs cost and project.** Claude sees your usage and its own recent output before each answer, and reads the
   project for what makes a mistake costly.
 - 👀 **Watch it live.** A chart in the pane shows the output tokens each gear spends, per 15 minutes, as you work.
@@ -136,7 +137,7 @@ that trade-off in your hands:
 - **You see what it costs, as it happens.** The pane's chart and table update with every model call, so after a press
   you watch the next answers follow your new setting.
 - **Your weekly limit is watched too.** When your usage runs ahead of the week, every gear gets one step harder on its
-  own, and the pane says so in amber.
+  own, and the pane says so in amber, with what you are spending a day and what the week allows a day.
 
 ## 🎛️ The Thinking effort pane
 
@@ -177,16 +178,25 @@ The mobile app shows the texts but has no fields to edit them yet.
 
 At the top of **Settings**, unchecked by default. Checked, Claude adds a quick score out of ten whenever it answers
 Max: how well a short plan would turn the work into clear, separate pieces. The mod compares the score with the
-trigger, no extra model call. The trigger is 7 by default; set it with **−** and **+** on the line "Break to simple when
-the score is over", from 1 to 9. It is kept for new sessions.
+trigger, no extra model call. The trigger is 7 by default; set it with **−** and **+** on the line "Break to simple at
+a score of at least", from 1 to 10. It is kept for new sessions.
 
 | Score | Effort sent |
 |---|---|
-| Over the trigger (8, 9 or 10 at the default 7) | **High** to write the plan, then **Medium** for each piece |
-| The trigger or less, or no score | **Max**, as Claude answered |
+| The trigger or more (7 to 10 at the default 7) | **High** to write the plan, then **Medium** for each piece |
+| Under the trigger, or no score | **Max**, as Claude answered |
 
 The pieces are done in the same conversation, not in subagents. The pane shows the last score and what it sent while the
 option is on. It is experimental: watch whether split work goes as well as Max before you rely on it.
+
+### ⚡ Fast mode at Medium
+
+In **Settings**, unchecked by default. Checked, fast mode follows the effort: on while the effort is **Medium** and
+weekly usage is under budget; off at High, Extra high or Max, or when the week is over budget. The mod cannot switch
+fast mode itself, so when the wanted state changes it adds a note beside the tool result, and Claude switches fast
+mode with the desktop app's session tool. The **Medium** card reads **Medium-Fast** in green while it is on. Fast
+mode is billed at fast-mode rates and switches only where the desktop app offers it. Unchecking it after an on sends
+one off note. It is kept for new sessions.
 
 ## ⌨️ Commands
 
@@ -263,6 +273,8 @@ keeping it across a restart and a plugin reload.
 
 The mod makes no model calls and no network requests. It reads the usage limits and token counts Claude Code already
 reports, and keeps its settings and each session's chart (for 24 hours) in Claude Code's local plugin storage.
+With **Fast mode at Medium** checked, Claude switches fast mode through the desktop app, and fast mode is billed at
+fast-mode rates.
 
 ## 📜 License
 

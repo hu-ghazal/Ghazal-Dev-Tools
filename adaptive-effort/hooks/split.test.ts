@@ -3,7 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import { parseSplitAnswer, splitGate, splitText } from './classify'
 
 // Break to simple (experimental): an unchecked Settings option. Claude scores out of ten without deliberating; the step
-// splits when the score is over the trigger, 7 by default and set from 1 to 9 in Settings.
+// splits at a score of the trigger or more, 7 by default and set from 1 to 10 in Settings.
 
 const OPUS = 'claude-opus-5-5'
 const PANE = { component: 'Pane', requestId: 'adaptive-effort', props: { title: 'Thinking effort' }, viewport: { columns: 60, rows: 20 } } as any
@@ -47,10 +47,10 @@ describe('experimental split before Max', () => {
     expect([parseSplitAnswer('printf "SPLIT=9"'), parseSplitAnswer('echo "a"\necho "SPLIT=9"'), parseSplitAnswer(undefined)], 'split.test.ts:S1-not-echo').toEqual([undefined, undefined, undefined])
   })
 
-  test('S2 the gate is the score over the trigger: at the default 7, 8 splits and 7 does not; at 5, 6 splits and 5 does not', () => {
-    expect([10, 8, 7, 0].map(s => splitGate(s).pass), 'split.test.ts:S2-default').toEqual([true, true, false, false])
-    expect([splitGate(6, 5).pass, splitGate(5, 5).pass, splitGate(9, 9).pass, splitGate(2, 1).pass], 'split.test.ts:S2-trigger').toEqual([true, false, false, true])
-    expect([splitText(8), splitText(7), splitText(6, 5)], 'split.test.ts:S2-text').toEqual(['split score 8/10 over 7', 'split score 7/10 not over 7', 'split score 6/10 over 5'])
+  test('S2 the gate is the score at the trigger or more: at the default 7, 7 splits and 6 does not; at 5, 5 splits and 4 does not', () => {
+    expect([10, 7, 6, 0].map(s => splitGate(s).pass), 'split.test.ts:S2-default').toEqual([true, true, false, false])
+    expect([splitGate(5, 5).pass, splitGate(4, 5).pass, splitGate(10, 10).pass, splitGate(9, 10).pass], 'split.test.ts:S2-trigger').toEqual([true, false, true, false])
+    expect([splitText(7), splitText(6), splitText(5, 5)], 'split.test.ts:S2-text').toEqual(['split score 7/10 at or over 7', 'split score 6/10 under 7', 'split score 5/10 at or over 5'])
   })
 
   test('S3 off by default: no rule beside the prompt and max is sent whatever the score', async ($, on) => {
@@ -66,7 +66,7 @@ describe('experimental split before Max', () => {
     expect([r.sent, r.note.includes('split')], 'split.test.ts:S3-max').toEqual(['max', false])
   })
 
-  test('S4 on from Settings: the rule goes beside the prompt, 8 sends High, 7 and no score leave Max, and new sessions keep it on', async ($, on) => {
+  test('S4 on from Settings: the rule goes beside the prompt, 7 sends High, 6 and no score leave Max, and new sessions keep it on', async ($, on) => {
     const clock = mock.clock(on)
     mock.store(on)
     const efforts = harness(on)
@@ -81,10 +81,10 @@ describe('experimental split before Max', () => {
     expect((sent?.context ?? []).join('\n').includes('experimental split (on)'), 'split.test.ts:S4-rule').toBe(true)
     await $.turn.start({ turnId: 't1', text: 'go' })
     await step($, 0)
-    const pass = await answerMax($, clock, efforts as string[], ' SPLIT=8', 1)
-    expect([pass.sent, pass.note.includes('split score 8/10 over 7: split')], 'split.test.ts:S4-pass').toEqual(['high', true])
-    const fail = await answerMax($, clock, efforts as string[], ' SPLIT=7', 2)
-    expect([fail.sent, fail.note.includes('split score 7/10 not over 7: no split; Max stands')], 'split.test.ts:S4-fail').toEqual(['max', true])
+    const pass = await answerMax($, clock, efforts as string[], ' SPLIT=7', 1)
+    expect([pass.sent, pass.note.includes('split score 7/10 at or over 7: split')], 'split.test.ts:S4-pass').toEqual(['high', true])
+    const fail = await answerMax($, clock, efforts as string[], ' SPLIT=6', 2)
+    expect([fail.sent, fail.note.includes('split score 6/10 under 7: no split; Max stands')], 'split.test.ts:S4-fail').toEqual(['max', true])
     const none = await answerMax($, clock, efforts as string[], '', 3)
     expect([none.sent, none.note.includes('split')], 'split.test.ts:S4-no-score').toEqual(['max', false])
     await start($)
@@ -92,36 +92,36 @@ describe('experimental split before Max', () => {
     expect((next?.context ?? []).join('\n').includes('experimental split (on)'), 'split.test.ts:S4-kept').toBe(true)
   })
 
-  test('S5 the trigger is set beside Break to simple with - and +, from 1 to 9, used by the gate and kept for new sessions', async ($, on) => {
+  test('S5 the trigger is set beside Break to simple with - and +, from 1 to 10, used by the gate and kept for new sessions', async ($, on) => {
     const clock = mock.clock(on)
     mock.store(on)
     const efforts = harness(on)
     await start($)
     const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
     await ui.press({ key: 'settings' })
-    const trigger = async () => (await ui.find({ type: 'Text', text: /^[1-9]$/ }))?.text
-    expect([await trigger(), (await ui.find({ type: 'Text', text: 'Break to simple when the score is over' })) !== undefined], 'split.test.ts:S5-default').toEqual(['7', true])
+    const trigger = async () => (await ui.find({ type: 'Text', text: /^(?:[1-9]|10)$/ }))?.text
+    expect([await trigger(), (await ui.find({ type: 'Text', text: 'Break to simple at a score of at least' })) !== undefined], 'split.test.ts:S5-default').toEqual(['7', true])
     await ui.press({ key: 'split' })
     await ui.press({ key: 'split-down' })
     await ui.press({ key: 'split-down' })
     expect(await trigger(), 'split.test.ts:S5-down').toBe('5')
     await ui.unmount()
     const sent: any = await $.prompt.submit({ text: 'go' } as any)
-    expect((sent?.context ?? []).join('\n').includes('A score over 5 runs the step at High'), 'split.test.ts:S5-rule').toBe(true)
+    expect((sent?.context ?? []).join('\n').includes('A score of 5 or more runs the step at High'), 'split.test.ts:S5-rule').toBe(true)
     await $.turn.start({ turnId: 't1', text: 'go' })
     await step($, 0)
-    const pass = await answerMax($, clock, efforts as string[], ' SPLIT=6', 1)
-    expect([pass.sent, pass.note.includes('split score 6/10 over 5: split')], 'split.test.ts:S5-pass').toEqual(['high', true])
-    const fail = await answerMax($, clock, efforts as string[], ' SPLIT=5', 2)
-    expect([fail.sent, fail.note.includes('split score 5/10 not over 5: no split; Max stands')], 'split.test.ts:S5-fail').toEqual(['max', true])
+    const pass = await answerMax($, clock, efforts as string[], ' SPLIT=5', 1)
+    expect([pass.sent, pass.note.includes('split score 5/10 at or over 5: split')], 'split.test.ts:S5-pass').toEqual(['high', true])
+    const fail = await answerMax($, clock, efforts as string[], ' SPLIT=4', 2)
+    expect([fail.sent, fail.note.includes('split score 4/10 under 5: no split; Max stands')], 'split.test.ts:S5-fail').toEqual(['max', true])
     await start($)
     const next: any = await $.prompt.submit({ text: 'next session' } as any)
-    expect((next?.context ?? []).join('\n').includes('A score over 5 runs the step at High'), 'split.test.ts:S5-kept').toBe(true)
+    expect((next?.context ?? []).join('\n').includes('A score of 5 or more runs the step at High'), 'split.test.ts:S5-kept').toBe(true)
     const again: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
     // Settings is still open from the first pane: Done and Settings are one button.
     for (let i = 0; i < 9; i++) await again.press({ key: 'split-down' })
-    const low = (await again.find({ type: 'Text', text: /^[1-9]$/ }))?.text
+    const low = (await again.find({ type: 'Text', text: /^(?:[1-9]|10)$/ }))?.text
     for (let i = 0; i < 12; i++) await again.press({ key: 'split-up' })
-    expect([low, (await again.find({ type: 'Text', text: /^[1-9]$/ }))?.text], 'split.test.ts:S5-bounds').toEqual(['1', '9'])
+    expect([low, (await again.find({ type: 'Text', text: /^(?:[1-9]|10)$/ }))?.text], 'split.test.ts:S5-bounds').toEqual(['1', '10'])
   })
 })
