@@ -137,7 +137,8 @@ that trade-off in your hands:
 - **You see what it costs, as it happens.** The pane's chart and table update with every model call, so after a press
   you watch the next answers follow your new setting.
 - **Your weekly limit is watched too.** When your usage runs ahead of the week, every gear gets one step harder on its
-  own, and the pane says so in amber, with what you are spending a day and what the week allows a day.
+  own, and the pane says so in amber, with the week's use so far and the
+  per-day pace against what the week allows a day.
 
 ## 🎛️ The Thinking effort pane
 

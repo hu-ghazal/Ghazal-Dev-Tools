@@ -3,6 +3,14 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.5.4 (2026-10-20)
+
+A clearer budget warning.
+
+- The warning now leads with the week's real use, then names the per-day figure as a pace: "16% of this week's limit
+  used. At the pace of the last few hours you would use 28.2% of it a day, more than the 15.1% a day the week allows."
+  Before, the per-day pace came first and read like usage.
+
 ## 1.5.3 (2026-10-20)
 
 The Medium card shows Medium-Fast only when fast mode is confirmed on.
