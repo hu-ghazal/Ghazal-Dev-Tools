@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, perDay } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, parseFastOff, perDay } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -462,6 +462,9 @@ export const register: Register = on => {
             await update($, fast, x => ({ ...x, told: want }))
             extra.push(fastNote(want))
           }
+          // FAST=off: the switch was refused (the app did not offer fast mode then). The card drops Medium-Fast and the
+          // next Medium answer asks again; read after this echo's note, so one echo never asks twice.
+          if (parseFastOff(ev.command ?? ev.input?.command) && fm.told === true) await update($, fast, x => ({ ...x, told: false }))
         }
       }
       // The user changed a threshold or a definition during this turn: the new rules reach Claude now, once.

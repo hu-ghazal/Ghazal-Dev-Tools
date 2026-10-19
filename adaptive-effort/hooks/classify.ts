@@ -497,7 +497,17 @@ export const splitRule = (trigger = SPLIT_TRIGGER) =>
 export const fastWanted = (level: number, b: Budget | undefined): boolean =>
   level === LEVELS.indexOf('medium') && b !== undefined && !overBudget(b)
 
+/** FAST=off on the first line of an EFFORT echo: Claude reports that the fast-mode switch was refused. */
+export function parseFastOff(command: unknown): boolean {
+  if (typeof command !== 'string') return false
+  const s = command.trimStart()
+  if (!/^echo\s/.test(s)) return false
+  return (s.split('\n')[0] ?? '').slice(4).trim().split(/\s+/)
+    .map(t => t.replace(/^["']+|["'.,;]+$/g, '').toUpperCase())
+    .includes('FAST=OFF')
+}
+
 export const fastNote = (on: boolean) =>
   on
-    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now.'
+    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now. If that call is refused, add FAST=off to your next EFFORT echo.'
     : 'adaptive-effort: fast mode off (not Medium, or weekly usage over budget): call set_session_fast_mode with session_id "self" and enabled false now.'

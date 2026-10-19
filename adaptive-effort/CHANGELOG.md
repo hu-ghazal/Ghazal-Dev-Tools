@@ -3,6 +3,15 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.5.1 (2026-10-19)
+
+Fast mode at Medium recovers when the switch is refused.
+
+- When the desktop app does not offer fast mode at that moment, the switch is refused. Claude now adds `FAST=off` to
+  its next EFFORT answer; the Medium card then shows plain **Medium** again, and the next Medium answer asks for fast
+  mode again. Before, the card stayed **Medium-Fast** and no second request came until the effort changed.
+- Tests: `FAST=off` read only from the echo, the card dropping Medium-Fast, and the next Medium asking again.
+
 ## 1.5.0 (2026-10-19)
 
 Break to simple at the trigger, a clearer budget warning, and fast mode at Medium.
