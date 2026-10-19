@@ -499,15 +499,27 @@ export const fastWanted = (level: number, b: Budget | undefined): boolean =>
 
 /** FAST=off on the first line of an EFFORT echo: Claude reports that the fast-mode switch was refused. */
 export function parseFastOff(command: unknown): boolean {
-  if (typeof command !== 'string') return false
-  const s = command.trimStart()
-  if (!/^echo\s/.test(s)) return false
-  return (s.split('\n')[0] ?? '').slice(4).trim().split(/\s+/)
-    .map(t => t.replace(/^["']+|["'.,;]+$/g, '').toUpperCase())
-    .includes('FAST=OFF')
+  return parseFastReport(command) === 'off'
 }
+
+/** FAST=on or FAST=off on the first line of an EFFORT echo (the last one counts): what get_session showed. */
+export function parseFastReport(command: unknown): 'on' | 'off' | undefined {
+  if (typeof command !== 'string') return undefined
+  const s = command.trimStart()
+  if (!/^echo\s/.test(s)) return undefined
+  let found: 'on' | 'off' | undefined
+  for (const raw of (s.split('\n')[0] ?? '').slice(4).trim().split(/\s+/)) {
+    const t = raw.replace(/^["']+|["'.,;]+$/g, '').toUpperCase()
+    if (t === 'FAST=ON') found = 'on'
+    else if (t === 'FAST=OFF') found = 'off'
+  }
+  return found
+}
+
+/** Beside each prompt while fast mode is asked: Claude checks and reports, so the card shows only what is true. */
+export const FAST_CHECK = 'adaptive-effort: fast mode was asked on. In your EFFORT echo, read get_session for this session first and add FAST=on if fastMode is on, FAST=off if it is not.'
 
 export const fastNote = (on: boolean) =>
   on
-    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now. If that call is refused, add FAST=off to your next EFFORT echo.'
+    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now. If that call is refused, or at your next EFFORT echo get_session for this session shows fastMode not on, add FAST=off to that echo; when it shows fastMode on, add FAST=on.'
     : 'adaptive-effort: fast mode off (not Medium, or weekly usage over budget): call set_session_fast_mode with session_id "self" and enabled false now.'

@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { fastWanted, parseFastOff, weeklyBudget } from './classify'
+import { fastNote, fastWanted, parseFastOff, parseFastReport, weeklyBudget } from './classify'
 
 // Fast mode at Medium: an unchecked Settings option. Checked, fast mode is on only at Medium with the week under budget.
 
@@ -69,7 +69,12 @@ describe('fast mode at Medium', () => {
     expect(await note($, 'medium'), 'fast.test.ts:F2-kept').toBe('on')
   })
 
-  test('F3 a refused switch, reported as FAST=off, drops Medium-Fast and the next Medium asks again', async ($, on) => {
+  test('F4 the on note asks for FAST=off when the switch is refused or fast mode is still off at the next echo', () => {
+    const n = fastNote(true)
+    expect([n.includes('If that call is refused'), n.includes('get_session for this session shows fastMode not on'), fastNote(false).includes('FAST=off')], 'fast.test.ts:F4-note').toEqual([true, true, false])
+  })
+
+  test('F3 Medium-Fast only after FAST=on confirms it; FAST=off drops it and the next Medium asks again', async ($, on) => {
     expect([' FAST=off', ' fast=off"', ' FAST=on', ' XFAST=off', ''].map(x => parseFastOff(ANSWER('medium', x))), 'fast.test.ts:F3-parse').toEqual([true, true, false, false, false])
     expect(parseFastOff('ls FAST=off'), 'fast.test.ts:F3-echo-only').toBe(false)
     mock.clock(on)
@@ -81,8 +86,27 @@ describe('fast mode at Medium', () => {
     await ui.press({ key: 'fast' })
     await ui.press({ key: 'settings' })
     const card = async () => ((await ui.find({ type: 'Text', text: ' Medium-Fast ' })) !== undefined ? 'fast' : 'plain')
-    expect([await note($, 'medium'), await card()], 'fast.test.ts:F3-on').toEqual(['on', 'fast'])
+    expect([await note($, 'medium'), await card()], 'fast.test.ts:F3-on').toEqual(['on', 'plain'])
+    expect([await note($, 'medium', ' FAST=on'), await card()], 'fast.test.ts:F3-confirmed').toEqual(['', 'fast'])
     expect([await note($, 'medium', ' FAST=off'), await card()], 'fast.test.ts:F3-refused').toEqual(['', 'plain'])
-    expect([await note($, 'medium'), await card()], 'fast.test.ts:F3-retry').toEqual(['on', 'fast'])
+    expect([await note($, 'medium'), await card()], 'fast.test.ts:F3-retry').toEqual(['on', 'plain'])
+    expect([await note($, 'high', ' FAST=on'), await card()], 'fast.test.ts:F3-high-not-confirmed').toEqual(['off', 'plain'])
+    expect([parseFastReport(ANSWER('medium', ' FAST=on')), parseFastReport(ANSWER('medium', ' FAST=on FAST=off')), parseFastReport('ls FAST=on')], 'fast.test.ts:F3-report').toEqual(['on', 'off', undefined])
+  })
+
+  test('F5 while fast mode is asked on, each prompt carries the check line; otherwise none', async ($, on) => {
+    mock.clock(on)
+    mock.store(on)
+    harness(on, { used: 10 })
+    await start($)
+    const check = async () => ((await $.prompt.submit({ text: 'go' } as any))?.context ?? []).some((x: string) => x.includes('fast mode was asked on'))
+    const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    await ui.press({ key: 'settings' })
+    await ui.press({ key: 'fast' })
+    expect(await check(), 'fast.test.ts:F5-not-asked').toBe(false)
+    await note($, 'medium')
+    expect(await check(), 'fast.test.ts:F5-asked').toBe(true)
+    await note($, 'medium', ' FAST=off')
+    expect(await check(), 'fast.test.ts:F5-cleared').toBe(false)
   })
 })

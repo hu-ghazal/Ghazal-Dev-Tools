@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, parseFastOff, perDay } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, parseFastReport, perDay, FAST_CHECK } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -35,7 +35,7 @@ const definitions = atom({ plugin: 'adaptive-effort', key: 'definitions' } as co
 // Experimental split before Max: off by default, saved for new sessions; the last gate result for the pane.
 const split = atom({ plugin: 'adaptive-effort', key: 'split' } as const, { on: false, trigger: SPLIT_TRIGGER } as { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } })
 // Fast mode at Medium: unchecked by default, saved for new sessions; told is what the notes last asked this session.
-const fast = atom({ plugin: 'adaptive-effort', key: 'fast' } as const, { on: false } as { on: boolean; told?: boolean })
+const fast = atom({ plugin: 'adaptive-effort', key: 'fast' } as const, { on: false } as { on: boolean; told?: boolean; confirmed?: boolean })
 const editing = atom({ plugin: 'adaptive-effort', key: 'editing' } as const, false)
 
 const PANE = 'adaptive-effort'
@@ -83,6 +83,12 @@ async function setSplit($: EngineInterface, on: boolean) {
 async function setTrigger($: EngineInterface, by: number) {
   const x = await update($, split, s => ({ ...s, trigger: Math.min(SPLIT_TRIGGER_MAX, Math.max(SPLIT_TRIGGER_MIN, s.trigger + by)) }))
   await $.store.set(STORE_SPLIT_TRIGGER, x.trigger).catch(() => undefined)
+}
+
+/** The check line beside the prompt while fast mode is asked on. */
+async function fastCheckNow($: EngineInterface): Promise<string | undefined> {
+  const fm = await read($, fast)
+  return fm.on && fm.told === true ? FAST_CHECK : undefined
 }
 
 /** Fast mode at Medium on or off, now and for new sessions. */
@@ -370,7 +376,7 @@ export const register: Register = on => {
         ))}
         {edit ? null : (
           <Box flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
-            <Text bold color={fm.on && fm.told ? '#3DDC84' : GRAY} backgroundColor={CARD_PILL}>{fm.on && fm.told ? ' Medium-Fast ' : ' Medium '}</Text>
+            <Text bold color={fm.on && fm.told && fm.confirmed ? '#3DDC84' : GRAY} backgroundColor={CARD_PILL}>{fm.on && fm.told && fm.confirmed ? ' Medium-Fast ' : ' Medium '}</Text>
             <Text dimColor>{SUMMARY.medium}</Text>
           </Box>
         )}
@@ -419,7 +425,7 @@ export const register: Register = on => {
     const d = await read($, definitions)
     deliveredDefinitions = d
     const line = rulesLine(t, await budget($, now, false), lastHourUse(await read($, chart), now), d)
-    const rule = [await splitRuleNow($)].filter((x): x is string => x !== undefined)
+    const rule = [await splitRuleNow($), await fastCheckNow($)].filter((x): x is string => x !== undefined)
     return next({ ...e, context: [...(e.context ?? []), line, ...rule] })
   })
 
@@ -459,12 +465,15 @@ export const register: Register = on => {
           const fm = await read($, fast)
           const want = fm.on ? fastWanted(answered, await budget($, at, false)) : fm.told === true ? false : undefined
           if (want !== undefined && want !== fm.told) {
-            await update($, fast, x => ({ ...x, told: want }))
+            await update($, fast, x => ({ ...x, told: want, confirmed: false }))
             extra.push(fastNote(want))
           }
           // FAST=off: the switch was refused (the app did not offer fast mode then). The card drops Medium-Fast and the
           // next Medium answer asks again; read after this echo's note, so one echo never asks twice.
-          if (parseFastOff(ev.command ?? ev.input?.command) && fm.told === true) await update($, fast, x => ({ ...x, told: false }))
+          // FAST=on confirms it (the card turns Medium-Fast); FAST=off clears it.
+          const rep = parseFastReport(ev.command ?? ev.input?.command)
+          if (rep === 'on' && fm.told === true && want !== false) await update($, fast, x => ({ ...x, confirmed: true }))
+          if (rep === 'off' && fm.told === true) await update($, fast, x => ({ ...x, told: false, confirmed: false }))
         }
       }
       // The user changed a threshold or a definition during this turn: the new rules reach Claude now, once.
