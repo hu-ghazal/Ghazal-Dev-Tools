@@ -194,10 +194,10 @@ option is on. It is experimental: watch whether split work goes as well as Max b
 In **Settings**, unchecked by default. Checked, fast mode follows the effort: on while the effort is **Medium** and
 weekly usage is under budget; off at High, Extra high or Max, or when the week is over budget. The mod cannot switch
 fast mode itself, so when the wanted state changes it adds a note beside the tool result, and Claude switches fast
-mode with the desktop app's session tool. The **Medium** card reads **Medium-Fast** in green while it is on. Fast
+mode with the desktop app's session tool. The **Medium** card reads **Medium-Fast** in green once Claude confirms fast mode is on. Fast
 mode is billed at fast-mode rates and switches only where the desktop app offers it. Unchecking it after an on sends
-one off note. It is kept for new sessions. If the switch is refused, because the app does not offer fast mode at that
-moment, Claude says so with `FAST=off` in its next answer: the card goes back to **Medium**, and the next Medium answer
+one off note. It is kept for new sessions. If the switch is refused, or fast mode is still off at the next answer (the app
+does not offer it at that moment), Claude says so with `FAST=off` in that answer: the card goes back to **Medium**, and the next Medium answer
 asks again.
 
 ## ⌨️ Commands

@@ -3,6 +3,26 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.5.3 (2026-10-20)
+
+The Medium card shows Medium-Fast only when fast mode is confirmed on.
+
+- After the switch, the card stays plain **Medium** until Claude reads its session and answers `FAST=on`. When fast
+  mode is not on, Claude answers `FAST=off`: the card stays plain and the next Medium answer asks again. While fast mode
+  is asked on, a short line beside each prompt asks Claude to check, so the card follows the app when it turns fast
+  mode off on its own.
+- Tests: the card plain until confirmed, green after, plain again on `FAST=off`; the check line only while asked.
+
+## 1.5.2 (2026-10-20)
+
+Fast mode at Medium also recovers when the switch is accepted but fast mode stays off.
+
+- The app can accept the switch and still not run fast mode, for example while extra usage is turned off. The on note
+  now also asks Claude to read its session at the next EFFORT answer and add `FAST=off` when fast mode is not on. The
+  Medium card then shows plain **Medium** again, and the next Medium answer asks again. The read waits for the next
+  answer because a read taken right after the switch can still show the old state.
+- Tests: the on note names both cases; `FAST=off` only on the on note.
+
 ## 1.5.1 (2026-10-19)
 
 Fast mode at Medium recovers when the switch is refused.
