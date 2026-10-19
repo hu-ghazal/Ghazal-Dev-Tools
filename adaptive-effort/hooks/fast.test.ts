@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { fastWanted, weeklyBudget } from './classify'
+import { fastWanted, parseFastOff, weeklyBudget } from './classify'
 
 // Fast mode at Medium: an unchecked Settings option. Checked, fast mode is on only at Medium with the week under budget.
 
@@ -11,7 +11,7 @@ const PANE = { component: 'Pane', requestId: 'adaptive-effort', props: { title: 
 // 60% is over.
 const RESETS = new Date(96 * H).toISOString()
 const week = (used: number) => [{ kind: 'seven_day', percentUsed: used, resetsAt: RESETS }]
-const ANSWER = (effort: string) => `echo "EFFORT=${effort}"`
+const ANSWER = (effort: string, extra = '') => `echo "EFFORT=${effort}${extra}"`
 
 function harness(on: any, usage: { used: number }) {
   on('session.start', ($: any, e: any) => ({ cwd: e.cwd }))
@@ -30,8 +30,8 @@ function harness(on: any, usage: { used: number }) {
 
 const start = ($: any) => $.session.start({ cwd: '/work/project', surface: 'desktop', isInteractive: true })
 // The fast-mode note an answer brings: 'on', 'off' or '' for none.
-async function note($: any, effort: string) {
-  const r: any = await $.tool.call({ tool: 'Bash', command: ANSWER(effort) })
+async function note($: any, effort: string, extra = '') {
+  const r: any = await $.tool.call({ tool: 'Bash', command: ANSWER(effort, extra) })
   const t = (r?.context ?? []).join('\n')
   return t.includes('fast mode on') ? 'on' : t.includes('fast mode off') ? 'off' : ''
 }
@@ -67,5 +67,22 @@ describe('fast mode at Medium', () => {
     await ui.unmount()
     await start($)
     expect(await note($, 'medium'), 'fast.test.ts:F2-kept').toBe('on')
+  })
+
+  test('F3 a refused switch, reported as FAST=off, drops Medium-Fast and the next Medium asks again', async ($, on) => {
+    expect([' FAST=off', ' fast=off"', ' FAST=on', ' XFAST=off', ''].map(x => parseFastOff(ANSWER('medium', x))), 'fast.test.ts:F3-parse').toEqual([true, true, false, false, false])
+    expect(parseFastOff('ls FAST=off'), 'fast.test.ts:F3-echo-only').toBe(false)
+    mock.clock(on)
+    mock.store(on)
+    harness(on, { used: 10 })
+    await start($)
+    const ui: any = await $.ui.mount({ plugin: 'adaptive-effort', surface: 'desktop', ...PANE })
+    await ui.press({ key: 'settings' })
+    await ui.press({ key: 'fast' })
+    await ui.press({ key: 'settings' })
+    const card = async () => ((await ui.find({ type: 'Text', text: ' Medium-Fast ' })) !== undefined ? 'fast' : 'plain')
+    expect([await note($, 'medium'), await card()], 'fast.test.ts:F3-on').toEqual(['on', 'fast'])
+    expect([await note($, 'medium', ' FAST=off'), await card()], 'fast.test.ts:F3-refused').toEqual(['', 'plain'])
+    expect([await note($, 'medium'), await card()], 'fast.test.ts:F3-retry').toEqual(['on', 'fast'])
   })
 })
