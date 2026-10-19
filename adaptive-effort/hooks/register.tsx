@@ -381,7 +381,7 @@ export const register: Register = on => {
           </Box>
         )}
         {!edit && isOn && sp.on ? <Text dimColor>{`Break to simple (experimental) is on${sp.last ? `; last: ${splitText(sp.last.score, sp.trigger)}, ${sp.last.pass ? 'High to plan' : 'Max stood'}` : '; no Max answer yet'}.`}</Text> : null}
-        {over ? <Text color={WARN}>{`⚠ Spending ${b ? perDay(b.burn) : '?'}% a day, over the ${b ? perDay(b.allowed) : '?'}% a day the week allows (${b?.used}% used so far). So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
+        {over ? <Text color={WARN}>{`⚠ ${b?.used}% of this week's limit used. At ${b?.basis === 'recent' ? 'the pace of the last few hours' : "this week's pace"} you would use ${b ? perDay(b.burn) : '?'}% of it a day, more than the ${b ? perDay(b.allowed) : '?'}% a day the week allows. So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
         <Box flexDirection="column">
           <Box flexDirection="row" gap={1}>
             <Button key="save" label="Save as default" hotkey="s" variant="primary" onPress={() => saveThresholds($)} />
