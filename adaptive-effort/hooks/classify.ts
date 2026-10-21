@@ -491,35 +491,59 @@ export const splitRule = (trigger = SPLIT_TRIGGER) =>
 
 /**
  * Fast mode at Medium, unchecked by default. The mod has no call that sets fast mode, so a note asks Claude to switch
- * it through the desktop app's session tool. Fast only at Medium and only while a 7-day reading shows the week under
+ * it through the desktop app's session tool; the mod watches that call's result and reads the session's fast-mode
+ * state itself, so Claude reports nothing back. Fast only at Medium and only while a 7-day reading shows the week under
  * budget; no reading stays off.
  */
 export const fastWanted = (level: number, b: Budget | undefined): boolean =>
   level === LEVELS.indexOf('medium') && b !== undefined && !overBudget(b)
 
-/** FAST=off on the first line of an EFFORT echo: Claude reports that the fast-mode switch was refused. */
-export function parseFastOff(command: unknown): boolean {
-  return parseFastReport(command) === 'off'
-}
-
-/** FAST=on or FAST=off on the first line of an EFFORT echo (the last one counts): what get_session showed. */
-export function parseFastReport(command: unknown): 'on' | 'off' | undefined {
-  if (typeof command !== 'string') return undefined
-  const s = command.trimStart()
-  if (!/^echo\s/.test(s)) return undefined
-  let found: 'on' | 'off' | undefined
-  for (const raw of (s.split('\n')[0] ?? '').slice(4).trim().split(/\s+/)) {
-    const t = raw.replace(/^["']+|["'.,;]+$/g, '').toUpperCase()
-    if (t === 'FAST=ON') found = 'on'
-    else if (t === 'FAST=OFF') found = 'off'
-  }
-  return found
-}
-
-/** Beside each prompt while fast mode is asked: Claude checks and reports, so the card shows only what is true. */
-export const FAST_CHECK = 'adaptive-effort: fast mode was asked on. In your EFFORT echo, read get_session for this session first and add FAST=on if fastMode is on, FAST=off if it is not.'
-
 export const fastNote = (on: boolean) =>
   on
-    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now. If that call is refused, or at your next EFFORT echo get_session for this session shows fastMode not on, add FAST=off to that echo; when it shows fastMode on, add FAST=on.'
+    ? 'adaptive-effort: fast mode on (Medium, weekly usage under budget): call set_session_fast_mode with session_id "self" and enabled true now.'
     : 'adaptive-effort: fast mode off (not Medium, or weekly usage over budget): call set_session_fast_mode with session_id "self" and enabled false now.'
+
+/**
+ * What the mod last saw of this session's fast mode, with no word from Claude: the result of Claude's own switch call
+ * (from 'switch'; turns counts the turns begun since, as the app reports an accepted switch only after the session's
+ * next turn), or the app's own report through get_session (from 'app'). reason is the app's disabledReason.
+ */
+export type FastSeen = { mode: 'on' | 'off' | 'cooldown'; reason?: string; from: 'switch' | 'app'; at: number; turns?: number }
+
+/** get_session's fastMode; undefined when the text holds none (the session's process has not reported yet). */
+export function parseFastMode(text: unknown, at: number): FastSeen | undefined {
+  if (typeof text !== 'string') return undefined
+  let fm: unknown
+  try {
+    fm = (JSON.parse(text) as { fastMode?: unknown } | null)?.fastMode
+  } catch {
+    return undefined
+  }
+  if (typeof fm !== 'object' || fm === null) return undefined
+  const { state, disabledReason } = fm as { state?: unknown; disabledReason?: unknown }
+  if (state !== 'on' && state !== 'off' && state !== 'cooldown') return undefined
+  return { mode: state, ...(typeof disabledReason === 'string' && disabledReason !== '' ? { reason: disabledReason } : {}), from: 'app', at }
+}
+
+/**
+ * The fast-mode note an EFFORT answer brings: true asks on, false asks off, undefined none. With nothing seen yet, a
+ * note at each change of the wanted state. Otherwise none while the app already runs the wanted state, or says why
+ * fast mode cannot run now (cooldown, or off with a reason); and at most one note for each thing seen (pending: a note
+ * went out and nothing has been seen since).
+ */
+export function fastAsk(want: boolean | undefined, told: boolean | undefined, pending: boolean, seen: FastSeen | undefined): boolean | undefined {
+  if (want === undefined) return undefined
+  if (seen === undefined) return want !== told ? want : undefined
+  if (want ? seen.mode === 'on' || seen.mode === 'cooldown' || seen.reason !== undefined : seen.mode !== 'on') return undefined
+  return pending && told === want ? undefined : want
+}
+
+/** The Medium card's line beside the pill when fast mode cannot run: the app's own state and reason, in its words. */
+export const fastCardText = (s: FastSeen | undefined): string | undefined =>
+  s === undefined
+    ? undefined
+    : s.mode === 'cooldown'
+      ? 'fast cooling down'
+      : s.mode === 'off' && s.reason !== undefined
+        ? `fast off: ${s.reason.split('_').join(' ')}`
+        : undefined

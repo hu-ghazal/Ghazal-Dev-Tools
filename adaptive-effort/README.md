@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.4.0" src="https://img.shields.io/badge/version-1.4.0-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.5.5" src="https://img.shields.io/badge/version-1.5.5-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -195,11 +195,15 @@ option is on. It is experimental: watch whether split work goes as well as Max b
 In **Settings**, unchecked by default. Checked, fast mode follows the effort: on while the effort is **Medium** and
 weekly usage is under budget; off at High, Extra high or Max, or when the week is over budget. The mod cannot switch
 fast mode itself, so when the wanted state changes it adds a note beside the tool result, and Claude switches fast
-mode with the desktop app's session tool. The **Medium** card reads **Medium-Fast** in green once Claude confirms fast mode is on. Fast
-mode is billed at fast-mode rates and switches only where the desktop app offers it. Unchecking it after an on sends
-one off note. It is kept for new sessions. If the switch is refused, or fast mode is still off at the next answer (the app
-does not offer it at that moment), Claude says so with `FAST=off` in that answer: the card goes back to **Medium**, and the next Medium answer
-asks again.
+mode with the desktop app's session tool. Fast mode is billed at fast-mode rates and switches only where the desktop
+app offers it. Unchecking it after an on sends one off note. It is kept for new sessions.
+
+The **Medium** card shows what the app reports, with nothing asked of Claude: the mod watches the result of Claude's
+switch and reads the session's fast-mode state itself (through the app's own session tool, without opening a
+permission dialog). **Medium-Fast** in green while fast mode runs. When it cannot run, plain **Medium** with the
+app's reason beside it, such as `fast off: extra usage disabled` or `fast cooling down`; the mod then asks no more
+until the app reports something new. A refused switch shows plain **Medium** and is asked again at the next Medium
+answer.
 
 ## ⌨️ Commands
 
@@ -260,6 +264,8 @@ adaptive-effort keeps running the build it had, or none, until you reload it.
 | `the pane is not drawn here` | This surface draws no side pane | Use the commands below (`/adaptive-effort max harder`, `save`, `reset`); the terminal shows the chart as text rows |
 | `No model calls yet since this build loaded.` | The chart has nothing to show yet | Keep working: the chart and table fill in after the next answer |
 | An old version number in `/adaptive-effort` | The session still runs the old build | Run `/reload-plugins` |
+| `fast off: ...` beside the Medium card | The app reports fast mode off, with its reason | Nothing to do; it changes when the app does (for example once extra usage is turned on) |
+| `fast cooling down` beside the Medium card | The app has paused fast mode for a while | Nothing to do; Medium runs at the standard speed meanwhile |
 
 ## 🧪 Test
 

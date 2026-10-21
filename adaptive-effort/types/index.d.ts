@@ -51,7 +51,12 @@ declare module 'claude-code' {
       definitions: Record<'max' | 'xhigh' | 'high' | 'medium', { count?: string; shift?: number; code: string; general: string }[]>
       editing: boolean
       split: { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } }
-      fast: { on: boolean; told?: boolean; confirmed?: boolean }
+      fast: {
+        on: boolean
+        told?: boolean
+        pending?: boolean
+        seen?: { mode: 'on' | 'off' | 'cooldown'; reason?: string; from: 'switch' | 'app'; at: number; turns?: number }
+      }
     }
   }
 }
