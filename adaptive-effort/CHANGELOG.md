@@ -3,6 +3,19 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.5.5 (2026-10-21)
+
+The Medium card follows the app, with no answer asked of Claude.
+
+- After an accepted switch the card reads **Medium-Fast** at once. Once a turn has run, the mod reads the session's
+  fast-mode state itself through the app's session tool, and only when that read needs no permission dialog.
+- When fast mode cannot run, the card stays plain **Medium** with the app's reason beside it (`fast off: extra usage
+  disabled`, `fast cooling down`), and the mod sends no more notes until the app reports something new. Before, each
+  Medium answer could ask again for a switch the app would not make.
+- Claude no longer adds `FAST=on` or `FAST=off` to its answer, and no check line goes beside each prompt.
+- Tests: the card on an accepted, refused and turned-off switch; the app's report and reason; one note per thing seen;
+  no read before a whole turn has run; no dialog.
+
 ## 1.5.4 (2026-10-20)
 
 A clearer budget warning.

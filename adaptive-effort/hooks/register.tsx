@@ -7,8 +7,8 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, parseFastReport, perDay, FAST_CHECK } from './classify'
-import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, fastWanted, fastNote, fastAsk, fastCardText, parseFastMode, perDay } from './classify'
+import type { Definitions, DefinedLevel, FastSeen, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
 
@@ -34,8 +34,10 @@ const chart = atom({ plugin: 'adaptive-effort', key: 'chart' } as const, EMPTY_C
 const definitions = atom({ plugin: 'adaptive-effort', key: 'definitions' } as const, DEFAULT_DEFINITIONS as Definitions)
 // Experimental split before Max: off by default, saved for new sessions; the last gate result for the pane.
 const split = atom({ plugin: 'adaptive-effort', key: 'split' } as const, { on: false, trigger: SPLIT_TRIGGER } as { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } })
-// Fast mode at Medium: unchecked by default, saved for new sessions; told is what the notes last asked this session.
-const fast = atom({ plugin: 'adaptive-effort', key: 'fast' } as const, { on: false } as { on: boolean; told?: boolean; confirmed?: boolean })
+// Fast mode at Medium: unchecked by default, saved for new sessions; told is what the notes last asked this session
+// (pending: and nothing seen since), seen what the mod last saw of the session's fast mode itself, which the Medium card
+// shows.
+const fast = atom({ plugin: 'adaptive-effort', key: 'fast' } as const, { on: false } as { on: boolean; told?: boolean; pending?: boolean; seen?: FastSeen })
 const editing = atom({ plugin: 'adaptive-effort', key: 'editing' } as const, false)
 
 const PANE = 'adaptive-effort'
@@ -85,15 +87,28 @@ async function setTrigger($: EngineInterface, by: number) {
   await $.store.set(STORE_SPLIT_TRIGGER, x.trigger).catch(() => undefined)
 }
 
-/** The check line beside the prompt while fast mode is asked on. */
-async function fastCheckNow($: EngineInterface): Promise<string | undefined> {
+// The desktop app's session tool that reports a session's fast mode.
+const GET_SESSION = 'mcp__ccd_session_mgmt__get_session'
+
+/**
+ * Reads this session's fast mode from the app itself while the box is checked: no word from Claude, and never a dialog
+ * (read only when the permission check allows the call outright). The app reports an accepted switch only after the
+ * session's next turn, so the switch's own result stands until a whole turn has begun since.
+ */
+async function readFast($: EngineInterface): Promise<void> {
   const fm = await read($, fast)
-  return fm.on && fm.told === true ? FAST_CHECK : undefined
+  if (!fm.on || (fm.seen?.turns !== undefined && fm.seen.turns < 1)) return
+  const input = { session_id: 'self' }
+  if ((await $.tool.check({ tool: GET_SESSION, input }).catch(() => undefined))?.decision !== 'allow') return
+  const r = await $.tool.call({ tool: GET_SESSION, ...input } as Parameters<EngineInterface['tool']['call']>[0]).catch(() => undefined)
+  if (r === undefined || r.deny !== undefined || r.isError === true) return
+  const seen = parseFastMode(r.text, await $.clock.now())
+  if (seen !== undefined) await update($, fast, x => ({ ...x, seen, pending: false }))
 }
 
-/** Fast mode at Medium on or off, now and for new sessions. */
+/** Fast mode at Medium on or off, now and for new sessions; what was seen before the change no longer counts. */
 async function setFast($: EngineInterface, on: boolean) {
-  await update($, fast, x => ({ ...x, on }))
+  await update($, fast, x => ({ ...x, on, seen: undefined }))
   await $.store.set(STORE_FAST, on).catch(() => undefined)
 }
 
@@ -249,7 +264,7 @@ export const register: Register = on => {
   const SETTINGS_EXPLAIN = `The conditions Claude reads for each level, for code work and for other work. Write each in your own words. A number in a condition is its count: type another to change it; Easier, Harder and the weekly budget still move it. Enter saves a field (up to ${DEFINITION_MAX} characters) for every session.`
   const OFF_EXPLAIN = 'Off: Claude Code keeps its own effort, and nothing is added beside your prompts. Turn on lets Claude choose again. New sessions keep this choice.'
   const SPLIT_EXPLAIN = 'Off by default. On, Claude adds a quick score out of ten when it answers Max: how well the work splits into clear pieces. A score of the number above or more sends High to plan, then Medium for each piece; otherwise Max stands. Set the number with − and +; it is kept for new sessions.'
-  const FAST_EXPLAIN = 'Off by default. On, Claude switches fast mode on while the effort is Medium and weekly usage is under budget, and off at any other effort or over budget. Fast mode is billed at fast-mode rates; it switches only where the desktop app offers it. Kept for new sessions.'
+  const FAST_EXPLAIN = 'Off by default. On, Claude switches fast mode on while the effort is Medium and weekly usage is under budget, and off at any other effort or over budget. Fast mode is billed at fast-mode rates; it switches only where the desktop app offers it. The Medium card shows what the app reports: Medium-Fast in green while it runs, or why it cannot. Kept for new sessions.'
   const EXPLAIN = 'Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
   // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
   const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
@@ -277,6 +292,10 @@ export const register: Register = on => {
     const isOn = await read($, enabled)
     const sp = await read($, split)
     const fm = await read($, fast)
+    // The Medium card shows the session's fast mode as last seen, only while the box is checked: Medium-Fast in green
+    // when on, and the app's own reason beside the pill when it cannot run.
+    const fastNow = fm.on && fm.seen?.mode === 'on'
+    const fastWhy = fm.on ? fastCardText(fm.seen) : undefined
     const counts = countsIn(t, over)
     // Settings: each definition's code and general text in a field; Enter saves it as the default of every session. The
     // mobile app draws no field, so it says where to edit.
@@ -376,7 +395,8 @@ export const register: Register = on => {
         ))}
         {edit ? null : (
           <Box flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
-            <Text bold color={fm.on && fm.told && fm.confirmed ? '#3DDC84' : GRAY} backgroundColor={CARD_PILL}>{fm.on && fm.told && fm.confirmed ? ' Medium-Fast ' : ' Medium '}</Text>
+            <Text bold color={fastNow ? '#3DDC84' : GRAY} backgroundColor={CARD_PILL}>{fastNow ? ' Medium-Fast ' : ' Medium '}</Text>
+            {fastWhy !== undefined ? <Text color={WARN}>{fastWhy}</Text> : null}
             <Text dimColor>{SUMMARY.medium}</Text>
           </Box>
         )}
@@ -418,6 +438,7 @@ export const register: Register = on => {
   // thresholds or the budget does not rewrite the cached prefix.
   on('prompt.submit', async ($, e, next) => {
     if (!(await read($, enabled))) return next(e)
+    await readFast($).catch(() => undefined)
     const t = await read($, thresholds)
     delivered = t
     const now = await $.clock.now()
@@ -425,16 +446,20 @@ export const register: Register = on => {
     const d = await read($, definitions)
     deliveredDefinitions = d
     const line = rulesLine(t, await budget($, now, false), lastHourUse(await read($, chart), now), d)
-    const rule = [await splitRuleNow($), await fastCheckNow($)].filter((x): x is string => x !== undefined)
+    const rule = [await splitRuleNow($)].filter((x): x is string => x !== undefined)
     return next({ ...e, context: [...(e.context ?? []), line, ...rule] })
   })
 
   on('turn.start', async ($, e, next) => {
     fresh = true
+    // A turn begun after an accepted fast-mode switch: once it has run, the app reports what the session runs with.
+    if (e.agentId === undefined) await update($, fast, x => (x.seen?.turns === undefined ? x : { ...x, seen: { ...x.seen, turns: x.seen.turns + 1 } }))
     return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
+    // The mod's own calls (its fast-mode reading) are not Claude's: nothing to watch or add.
+    if (next.origin?.plugin === 'adaptive-effort') return next(e)
     const r = await next(e)
     if (e.agentId !== undefined || r.deny !== undefined) return r
     const extra: string[] = []
@@ -460,20 +485,27 @@ export const register: Register = on => {
             )
           }
           await update($, hold, s => ({ ...s, answer: { level: answered, at } }))
-          // Fast mode at Medium: a note only when the wanted state differs from the last one asked; unticked after an on,
-          // one off note.
+          // Fast mode at Medium: a note asks Claude to switch only when what the mod last saw of the session differs from
+          // what is wanted, and the app gives no reason it cannot run; unticked after an on, one off note.
           const fm = await read($, fast)
           const want = fm.on ? fastWanted(answered, await budget($, at, false)) : fm.told === true ? false : undefined
-          if (want !== undefined && want !== fm.told) {
-            await update($, fast, x => ({ ...x, told: want, confirmed: false }))
-            extra.push(fastNote(want))
+          const ask = fastAsk(want, fm.told, fm.pending === true, fm.seen)
+          if (ask !== undefined) {
+            await update($, fast, x => ({ ...x, told: ask, pending: true }))
+            extra.push(fastNote(ask))
           }
-          // FAST=off: the switch was refused (the app did not offer fast mode then). The card drops Medium-Fast and the
-          // next Medium answer asks again; read after this echo's note, so one echo never asks twice.
-          // FAST=on confirms it (the card turns Medium-Fast); FAST=off clears it.
-          const rep = parseFastReport(ev.command ?? ev.input?.command)
-          if (rep === 'on' && fm.told === true && want !== false) await update($, fast, x => ({ ...x, confirmed: true }))
-          if (rep === 'off' && fm.told === true) await update($, fast, x => ({ ...x, told: false, confirmed: false }))
+        }
+      }
+      // Claude's own fast-mode switch for this session: the card follows its result at once. A refusal reads the app's
+      // reason at once (the app refuses what it reports it cannot run), so the next Medium answer does not ask again.
+      if (e.tool.endsWith('__set_session_fast_mode') && (await read($, fast)).on) {
+        const ev = e as { session_id?: unknown; enabled?: unknown }
+        if (ev.session_id === 'self' && typeof ev.enabled === 'boolean') {
+          const at = await $.clock.now()
+          const accepted = r.isError !== true
+          const seen: FastSeen = accepted ? { mode: ev.enabled ? 'on' : 'off', from: 'switch', at, turns: 0 } : { mode: 'off', from: 'switch', at }
+          await update($, fast, x => ({ ...x, seen, pending: false }))
+          if (!accepted) await readFast($).catch(() => undefined)
         }
       }
       // The user changed a threshold or a definition during this turn: the new rules reach Claude now, once.
