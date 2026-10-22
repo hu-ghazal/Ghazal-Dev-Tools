@@ -1,6 +1,6 @@
 {
   "name": "adaptive-effort",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "Lets Claude choose its own reasoning effort (medium, high, xhigh or max) by clear rules, with a side pane to make each level harder or easier to reach, a 60 s hold between changes, a 10-minute limit on max and a weekly-budget step. No model calls.",
   "types": "./types/index.d.ts"
 }

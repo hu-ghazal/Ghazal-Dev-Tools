@@ -3,6 +3,17 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.5.6 (2026-10-22)
+
+Fast mode at Medium is removed.
+
+- The **Fast mode at Medium** box is gone from **Settings**, and the **Medium** card is plain again: no Medium-Fast
+  label and no fast-mode reason under it. The mod no longer adds notes asking Claude to switch fast mode and no longer
+  reads the session's fast-mode state. A saved fast-mode setting is cleared at the next session start.
+- Everything else from 1.5.0 to 1.5.5 stays: Break to simple at the trigger or more (1 to 10), and the budget warning
+  that names the week's use and the per-day pace.
+- Tests: the fast-mode tests are removed with the feature; every other test is unchanged.
+
 ## 1.5.5 (2026-10-21)
 
 The Medium card follows the app, with no answer asked of Claude.
