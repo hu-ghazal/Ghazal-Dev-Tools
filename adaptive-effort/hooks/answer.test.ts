@@ -38,7 +38,7 @@ const command = ($: any, args = '') =>
 
 describe('the answer', () => {
   test('EFFORT is read from an echo of EFFORT=<level> only', () => {
-    expect(['medium', 'high', 'xhigh', 'max'].map(l => parseEffortAnswer(ANSWER(l))), 'answer.test.ts:parse-levels').toEqual([0, 1, 2, 3])
+    expect(['low', 'medium', 'high', 'xhigh', 'max'].map(l => parseEffortAnswer(ANSWER(l))), 'answer.test.ts:parse-levels').toEqual([-1, 0, 1, 2, 3])
     expect([
       parseEffortAnswer('echo "note=yes EFFORT=MAX."'),
       parseEffortAnswer("echo 'EFFORT=high'"),
@@ -49,7 +49,7 @@ describe('the answer', () => {
     ], 'answer.test.ts:parse-forms').toEqual([3, 1, 1, 2, 0, 3])
     expect([
       parseEffortAnswer(ANSWER('medium|high|xhigh|max')),
-      parseEffortAnswer(ANSWER('low')),
+      parseEffortAnswer(ANSWER('low|medium|high|xhigh|max')),
       parseEffortAnswer(ANSWER('')),
       parseEffortAnswer('echo "note=yes other=no"'),
       parseEffortAnswer('grep "EFFORT=max" log.txt'),

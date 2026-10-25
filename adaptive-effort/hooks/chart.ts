@@ -10,10 +10,10 @@ import type { ChartBucket, ChartLog, EffortLevel } from '../types'
 // cache reads are the context, the same at every level, so they are not counted. Pure: the hooks module records each
 // step and its tokens and draws what chartView() returns.
 
-export const ORDER: readonly EffortLevel[] = ['medium', 'high', 'xhigh', 'max']
+export const ORDER: readonly EffortLevel[] = ['low', 'medium', 'high', 'xhigh', 'max']
 /** The chart's colours, lightest for medium. */
-export const COLOR: Record<EffortLevel, string> = { medium: '#B5D4F4', high: '#378ADD', xhigh: '#185FA5', max: '#042C53' }
-export const TITLE: Record<EffortLevel, string> = { medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
+export const COLOR: Record<EffortLevel, string> = { low: '#DCE9F7', medium: '#B5D4F4', high: '#378ADD', xhigh: '#185FA5', max: '#042C53' }
+export const TITLE: Record<EffortLevel, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
 // Calls are kept per 15 minutes; buckets older than KEEP_MS are deleted, so a chart holds at most 96 buckets.
 export const BUCKET_MS = 15 * 60_000
 /** Buckets older than this are deleted at every write. */
@@ -24,10 +24,13 @@ export const BARS = 24
 export const WIDTHS = [15, 30, 60] as const
 export const EMPTY_CHART: ChartLog = { buckets: [] }
 
-type Four = [number, number, number, number]
-const zero = (): Four => [0, 0, 0, 0]
-const total = (x: Four) => x[0] + x[1] + x[2] + x[3]
-const copy = (b: ChartBucket): ChartBucket => ({ at: b.at, n: [...b.n] as Four, tok: [...(b.tok ?? zero())] as Four, nt: [...(b.nt ?? zero())] as Four, ct: [...(b.ct ?? zero())] as Four })
+// One count per level of ORDER, low to max (a bucket saved with the four columns
+// medium to max reads back with a zero low column).
+type Four = number[]
+const zero = (): Four => ORDER.map(() => 0)
+const total = (x: readonly number[]) => x.reduce((a, b) => a + b, 0)
+const up = (x: readonly number[]): Four => (x.length === ORDER.length ? [...x] : [0, ...x])
+const copy = (b: ChartBucket): ChartBucket => ({ at: b.at, n: up(b.n), tok: up(b.tok ?? zero()), nt: up(b.nt ?? zero()), ct: up(b.ct ?? zero()) })
 
 /** One main-loop model call sent at `sent` at `now`, recorded once its response is in: one write per call, to keep
  *  the mod light. Counted by level with its output tokens, and as a call with usage when the response carried any;
@@ -38,7 +41,7 @@ export function recordStep(log: ChartLog, sent: EffortLevel, now: number, tokens
   const last = kept.at(-1)
   const b = last?.at === start ? copy(last) : { at: start, n: zero(), tok: zero(), nt: zero(), ct: zero() }
   const buckets = last?.at === start ? [...kept.slice(0, -1), b] : [...kept, b]
-  const i = ORDER.indexOf(sent)
+  const i = Math.max(0, ORDER.indexOf(sent))
   b.n[i] += 1
   if (tokens > 0) {
     b.tok![i] += Math.round(tokens)
@@ -56,7 +59,8 @@ export const STORE_CHART = 'chart:'
 export const SAVE_EVERY_MS = 60_000
 export const MAX_SAVED = 30
 
-const isFour = (x: unknown): x is Four => Array.isArray(x) && x.length === 4 && x.every(n => typeof n === 'number' && n >= 0)
+const isFour = (x: unknown): x is Four =>
+  Array.isArray(x) && (x.length === ORDER.length || x.length === ORDER.length - 1) && x.every(n => typeof n === 'number' && n >= 0)
 
 /** A saved chart read back: only its buckets of the last 24 hours; undefined when it is not a chart. */
 export function restored(x: unknown, now: number): ChartLog | undefined {
@@ -64,7 +68,7 @@ export function restored(x: unknown, now: number): ChartLog | undefined {
   if (typeof l !== 'object' || l === null || !Array.isArray(l.buckets)) return undefined
   const buckets = l.buckets
     .filter(b => typeof b?.at === 'number' && isFour(b.n) && b.at > now - KEEP_MS)
-    .map(b => ({ at: b.at, n: [...b.n] as Four, tok: isFour(b.tok) ? ([...b.tok] as Four) : zero(), nt: isFour(b.nt) ? ([...b.nt] as Four) : zero(), ct: isFour(b.ct) ? ([...b.ct] as Four) : zero() }))
+    .map(b => ({ at: b.at, n: up(b.n), tok: isFour(b.tok) ? up(b.tok) : zero(), nt: isFour(b.nt) ? up(b.nt) : zero(), ct: isFour(b.ct) ? up(b.ct) : zero() }))
   const last = ORDER.includes(l.last as EffortLevel) ? l.last : undefined
   return { buckets, last }
 }
@@ -73,7 +77,7 @@ export function restored(x: unknown, now: number): ChartLog | undefined {
  *  with memory intact and ahead of the last save; an app restart runs it with memory empty. Per quarter hour the bucket
  *  with more calls wins (memory, on a tie), so neither loses what the other has. */
 export function merged(mem: ChartLog, saved: ChartLog): ChartLog {
-  const sum = (b: ChartBucket) => b.n[0] + b.n[1] + b.n[2] + b.n[3]
+  const sum = (b: ChartBucket) => total(b.n)
   const by = new Map<number, ChartBucket>()
   for (const b of saved.buckets) by.set(b.at, b)
   for (const b of mem.buckets) {
@@ -111,7 +115,7 @@ export type ChartView = {
 /** The columns from the first bucket with output tokens to now: 15 minutes wide while that fits BARS columns, else the
  *  next width in WIDTHS. Calls of older builds that recorded no tokens are not drawn and not averaged. */
 export function chartView(log: ChartLog, now: number): ChartView {
-  const kept = log.buckets.filter(x => x.at > now - KEEP_MS && total(x.tok ?? zero()) > 0)
+  const kept = log.buckets.map(copy).filter(x => x.at > now - KEEP_MS && total(x.tok ?? zero()) > 0)
   const span = kept.length === 0 ? 0 : now - kept[0].at
   const minutes = WIDTHS.find(w => span < w * 60_000 * BARS) ?? 60
   const size = minutes * 60_000
@@ -124,7 +128,7 @@ export function chartView(log: ChartLog, now: number): ChartView {
       const col = { at, tok: zero() }
       for (const x of kept) {
         if (x.at < at || x.at >= at + size) continue
-        for (let i = 0; i < 4; i++) col.tok[i] += x.tok![i]
+        for (let i = 0; i < ORDER.length; i++) col.tok[i] += x.tok![i]
       }
       bars.push(col)
     }
@@ -132,7 +136,7 @@ export function chartView(log: ChartLog, now: number): ChartView {
   const shown = bars.slice(-BARS)
   for (const x of kept) {
     if (x.at < (shown[0]?.at ?? Infinity)) continue
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < ORDER.length; i++) {
       calls[i] += x.nt?.[i] ?? 0
       tokens[i] += x.tok![i]
       // Output per call divides the tokens of the calls that reported usage by their number.
@@ -147,10 +151,10 @@ export type SessionUse = { calls: number; tokens: Four }
  *  by level: what Claude weighs before it answers EFFORT. */
 export function lastHourUse(log: ChartLog, now: number): SessionUse {
   const use: SessionUse = { calls: 0, tokens: zero() }
-  for (const x of log.buckets) {
+  for (const x of log.buckets.map(copy)) {
     if (x.at <= now - 3_600_000) continue
     use.calls += total(x.nt ?? zero())
-    for (let i = 0; i < 4; i++) use.tokens[i] += x.tok?.[i] ?? 0
+    for (let i = 0; i < ORDER.length; i++) use.tokens[i] += x.tok?.[i] ?? 0
   }
   return use
 }
@@ -237,7 +241,7 @@ export function chartAlt(v: ChartView, label: (at: number) => string): string {
 }
 
 /** The terminal, which draws no Svg: one text row per column with a mark per level, the tallest 20 marks wide. */
-export const MARK: Record<EffortLevel, string> = { medium: '░', high: '▒', xhigh: '▓', max: '█' }
+export const MARK: Record<EffortLevel, string> = { low: '·', medium: '░', high: '▒', xhigh: '▓', max: '█' }
 export function textRows(v: ChartView, label: (at: number) => string): string[] {
   const peak = Math.max(1, ...v.bars.map(b => total(b.tok)))
   return v.bars.map(b => {

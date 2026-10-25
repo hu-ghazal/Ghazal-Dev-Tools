@@ -6,13 +6,20 @@
 // Effort levels, the effort rules and the limits adaptive-effort applies to Claude's own effort answer. Pure functions:
 // no engine calls, so tests exercise them directly.
 
-import { kTokens } from './chart'
+import { kTokens, ORDER } from './chart'
 
 export const LEVELS = ['medium', 'high', 'xhigh', 'max'] as const
-export type Level = (typeof LEVELS)[number]
+export type Level = (typeof LEVELS)[number] | 'low'
 
-/** The effort to send for a level index, never below medium. */
+/** Claude's answer EFFORT=low: questions, a one-to-one conversation or information asked for, below medium. */
+export const LOW = -1
+
+/** The name of an answered level: -1 is low, 0-3 medium to max. */
+export const answerName = (level: number): Level => (level < 0 ? 'low' : LEVELS[Math.min(3, Math.trunc(level))] ?? 'medium')
+
+/** The effort to send for a level index; low only when Claude answered it (LOW). */
 export function applied(level: number): Level {
+  if (level < 0) return 'low'
   return LEVELS[Math.min(3, Math.max(0, Math.trunc(level)))] ?? 'medium'
 }
 
@@ -74,11 +81,13 @@ export function dwell(
   now: number,
 ): { effort: Level; changed: boolean } {
   if (current === undefined || changedAt === undefined) return { effort: desired, changed: true }
+  // Out of low at once: low is never held while the work needs more.
+  if (current === 'low' && desired !== 'low') return { effort: desired, changed: true }
   if (desired === current || now - changedAt < MIN_DWELL_MS) return { effort: current, changed: false }
   return { effort: desired, changed: true }
 }
 
-/** The longest run of max. */
+/** The longest run of xhigh or of max. */
 export const MAX_HOLD_MS = 600_000
 
 /**
@@ -88,7 +97,8 @@ export const MAX_HOLD_MS = 600_000
 export type MaxClock = { since?: number; capped: boolean; endedAt?: number }
 
 /**
- * Caps a run of max at MAX_HOLD_MS: then max drops to medium and stays blocked until a new prompt (`fresh`). A new
+ * Caps a run of `level` (max, or xhigh with its own clock) at MAX_HOLD_MS: then it drops to medium and stays blocked
+ * until a new prompt (`fresh`). A new
  * prompt lifts the cap only once the run has ended; it never lengthens a run inside its limit.
  * A max answer given before the cap stopped its run (`answeredAt` < `endedAt`) is spent: it sends medium on the new
  * prompt and after it, so only a max answered again starts a new run. The limit counts wall time, so a run that ran
@@ -100,19 +110,20 @@ export function capMax(
   now: number,
   fresh: boolean,
   answeredAt?: number,
+  level: Level = 'max',
 ): { effort: Level; clock: MaxClock } {
   const expired = clock.since !== undefined && now - clock.since >= MAX_HOLD_MS
-  const stale = desired === 'max' && clock.endedAt !== undefined && (answeredAt === undefined || answeredAt < clock.endedAt)
+  const stale = desired === level && clock.endedAt !== undefined && (answeredAt === undefined || answeredAt < clock.endedAt)
   if (!clock.capped && !expired) return { effort: stale ? 'medium' : desired, clock }
   if (!fresh) {
-    return { effort: desired === 'max' ? 'medium' : desired, clock: { ...clock, capped: true, endedAt: clock.endedAt ?? now } }
+    return { effort: desired === level ? 'medium' : desired, clock: { ...clock, capped: true, endedAt: clock.endedAt ?? now } }
   }
   return { effort: stale ? 'medium' : desired, clock: clock.endedAt === undefined ? { capped: false } : { capped: false, endedAt: clock.endedAt } }
 }
 
-/** A run of max starts when max is first sent and ends when any other effort is sent; a new run forgets `endedAt`. */
-export function trackMax(clock: MaxClock, sent: Level, now: number): MaxClock {
-  if (sent !== 'max') return clock.endedAt === undefined ? { capped: clock.capped } : { capped: clock.capped, endedAt: clock.endedAt }
+/** A run of `level` starts when it is first sent and ends when any other effort is sent; a new run forgets `endedAt`. */
+export function trackMax(clock: MaxClock, sent: Level, now: number, level: Level = 'max'): MaxClock {
+  if (sent !== level) return clock.endedAt === undefined ? { capped: clock.capped } : { capped: clock.capped, endedAt: clock.endedAt }
   return { since: clock.since ?? now, capped: clock.capped }
 }
 
@@ -126,6 +137,9 @@ const HOUR_MS = 3600_000
 export const PACE_WINDOW_MS = 6 * HOUR_MS
 export const PACE_MIN_SPAN_MS = 30 * 60_000
 export const PACE_SAMPLE_MS = 5 * 60_000
+/** Under this many hours into a week with no recent rate, the week so far is too short to read a pace: a whole-percent
+ *  reading of 1% an hour into the week read as 31% a day and over budget. */
+export const PACE_MIN_WEEK_H = 12
 
 export type PaceSample = { at: number; used: number }
 /** The readings of one week (`resetsAt` in epoch ms). */
@@ -156,7 +170,7 @@ export type Budget = {
   allowed: number
   /** % per hour being spent: over the recent readings, else the week so far. */
   burn: number
-  basis: 'recent' | 'week'
+  basis: 'recent' | 'week' | 'early'
   /** allowed / burn: the share of the current spend the rest of the week pays for (Infinity with no spend). */
   h: number
 }
@@ -179,9 +193,10 @@ export function weeklyBudget(limits: readonly RateLimit[], now: number, samples:
   const z = rises[rises.length - 1]
   const recent = rises.length >= 2 && z.at - a.at >= PACE_MIN_SPAN_MS
   const hoursGone = Math.max(0, (WEEK_MS - (w.resets - now)) / HOUR_MS)
-  const burn = recent ? (z.used - a.used) / ((z.at - a.at) / HOUR_MS) : hoursGone > 0 ? w.used / hoursGone : 0
+  const early = !recent && hoursGone < PACE_MIN_WEEK_H
+  const burn = recent ? (z.used - a.used) / ((z.at - a.at) / HOUR_MS) : early ? 0 : hoursGone > 0 ? w.used / hoursGone : 0
   const h = left <= 0 ? 0 : burn > 0 ? allowed / burn : Infinity
-  return { used: w.used, left, hoursLeft, allowed, burn, basis: recent ? 'recent' : 'week', h }
+  return { used: w.used, left, hoursLeft, allowed, burn, basis: recent ? 'recent' : early ? 'early' : 'week', h }
 }
 
 /** Over the weekly budget: the rest of the week pays for less than the current spend. */
@@ -192,7 +207,7 @@ export const overBudget = (b: Budget | undefined): boolean => b !== undefined &&
  * Claude's effort answer: a Bash call `echo "EFFORT=<level>"`, which the line beside each prompt asks for. The level is
  * the last `EFFORT=` token on the first line of a command that starts with echo; other tokens on the line are allowed,
  * a trailing quote or '.', ',' or ';' is ignored, and anything that is not a level (such as the template
- * "medium|high|xhigh|max") is no answer.
+ * "low|medium|high|xhigh|max") is no answer.
  */
 export function parseEffortAnswer(command: unknown): number | undefined {
   if (typeof command !== 'string') return undefined
@@ -206,9 +221,9 @@ export function parseEffortAnswer(command: unknown): number | undefined {
     if (eq <= 0 || tok.slice(0, eq).toUpperCase() !== 'EFFORT') continue
     let v = tok.slice(eq + 1).toLowerCase()
     while (v && '.,;"\''.includes(v.charAt(v.length - 1))) v = v.slice(0, -1)
-    const lvl = LEVELS.indexOf(v as Level)
+    const lvl = v === 'low' ? LOW : LEVELS.indexOf(v as Level)
     seen = true
-    found = lvl >= 0 ? lvl : undefined
+    found = v === 'low' || lvl >= 0 ? lvl : undefined
   }
   return seen ? found : undefined
 }
@@ -265,8 +280,8 @@ export const ordinal = (n: number): string =>
 export type CountKey = 'design' | 'attempts' | 'systems' | 'failure' | 'files' | 'steps'
 /** One condition in two versions, for code work and for any other work; `count` is fixed, the texts are the user's. */
 export type Definition = { count?: CountKey; shift?: number; code: string; general: string }
-export type DefinedLevel = Raised | 'medium'
-export const DEFINED: readonly DefinedLevel[] = ['max', 'xhigh', 'high', 'medium']
+export type DefinedLevel = Raised | 'medium' | 'low'
+export const DEFINED: readonly DefinedLevel[] = ['max', 'xhigh', 'high', 'medium', 'low']
 export type Definitions = Record<DefinedLevel, Definition[]>
 
 /** The default definitions: each names something Claude can count or see, once for code work and once for any work. */
@@ -287,11 +302,19 @@ export const DEFAULT_DEFINITIONS: Definitions = {
       code: 'a change across {n} or more modules or services that must ship together',
       general: 'a change across {n} or more separate parts that must change together',
     },
+    {
+      code: 'a design or architecture flaw in the code that a fix did not resolve, or designing or redesigning how a module or service is built',
+      general: 'a design flaw that a fix did not resolve, or deciding how a whole system is built',
+    },
   ],
   xhigh: [
     { count: 'failure', code: 'the same test or check fails a {nth} time', general: 'the same problem comes back a {nth} time' },
     { code: 'a test or check that passed earlier fails again', general: 'something believed done turns out wrong' },
     { code: 'the code behaves differently from what reading it says', general: 'a result differs from what was expected' },
+    {
+      code: 'a design or architecture flaw found in the code: a wrong module structure, a broken interface contract, or a design that cannot meet its requirement',
+      general: 'a flaw found in how the work is designed or put together',
+    },
   ],
   high: [
     { count: 'files', code: '{n} or more files that must stay consistent', general: '{n} or more pieces that must agree with each other' },
@@ -307,6 +330,7 @@ export const DEFAULT_DEFINITIONS: Definitions = {
       general: 'anything smaller: a clear next step where a mistake is easy to see and undo',
     },
   ],
+  low: [{ code: "questions, a one-to-one back-and-forth conversation, or information the user asked for, apart from starting the work; never while editing files, running checks or doing the job itself", general: 'questions, a one-to-one back-and-forth conversation, or information asked for, apart from starting the work; never while doing the job itself' }],
 }
 
 /** The longest definition text kept. */
@@ -318,7 +342,8 @@ export function validDefinitions(v: unknown): Definitions | undefined {
   const o = v as Record<string, unknown>
   const out = {} as Definitions
   for (const l of DEFINED) {
-    const list = o[l]
+    // Definitions saved before the low level existed still load, with the default low.
+    const list = o[l] ?? (l === 'low' ? DEFAULT_DEFINITIONS.low : undefined)
     if (!Array.isArray(list) || list.length !== DEFAULT_DEFINITIONS[l].length) return undefined
     out[l] = []
     for (let i = 0; i < list.length; i++) {
@@ -397,8 +422,10 @@ export function usageLine(b: Budget | undefined, session?: { calls: number; toke
   const week = !b
     ? 'no weekly reading yet.'
     : `this week ${b.used}% used, ${Math.round(b.left * 10) / 10}% left for ${Math.round(b.hoursLeft)} h: ${perDay(b.allowed)}% a day ` +
-      `allowed, spending ${perDay(b.burn)}% a day (${b.basis === 'recent' ? 'recent readings' : 'the week so far'}).`
-  const pace = !b
+      (b.basis === 'early'
+        ? 'allowed; too early in the week to read a pace.'
+        : `allowed, spending ${perDay(b.burn)}% a day (${b.basis === 'recent' ? 'recent readings' : 'the week so far'}).`)
+  const pace = !b || b.basis === 'early'
     ? ''
     : b.h < 1
       ? ' Spending faster than the week allows: lean to the lower of the levels that fit, and drop back as soon as the hard part ends.'
@@ -411,7 +438,7 @@ export function usageLine(b: Budget | undefined, session?: { calls: number; toke
     : session.calls === 0
       ? ' This session, last hour: no calls yet.'
       : ` This session, last hour: ${session.calls} ${session.calls === 1 ? 'call' : 'calls'}, ${kTokens(all)} output tokens (` +
-        LEVELS.flatMap((l, i) => (session.tokens[i] > 0 ? [`${l} ${kTokens(session.tokens[i])}`] : [])).join(', ') +
+        ORDER.flatMap((l, i) => (session.tokens[i] > 0 ? [`${l} ${kTokens(session.tokens[i])}`] : [])).join(', ') +
         ').'
   return (
     `Usage: ${week}${pace}${mine} When the conditions of more than one level fit, the choice among them is yours, by ` +
@@ -440,13 +467,13 @@ export function rulesLine(
   const r = levelRules(countsIn(t, over), d)
   return (
     'adaptive-effort: decide your reasoning effort for the coming steps and answer with one Bash call, ' +
-    'echo "EFFORT=medium|high|xhigh|max" (one level), before other work. Each condition is given for code work, then ' +
+    'echo "EFFORT=low|medium|high|xhigh|max" (one level), before other work. Each condition is given for code work, then ' +
     '(general: ...) for other work. ' +
     DEFINED.map(l => `${l}: ${r[l].map(ruleText).join('; ')}.`).join(' ') +
     (why ? ` (Counts in force: ${why}.)` : '') +
     ' When the work changes, echo a new EFFORT; drop back as soon as the hard part ends. ' +
     usageLine(b, session) +
-    ` Limits applied by the mod: ${MIN_DWELL_MS / 1000} s between changes; max at most ${MAX_HOLD_MS / 60_000} minutes, then medium until the next prompt.`
+    ` Limits applied by the mod: ${MIN_DWELL_MS / 1000} s between changes; xhigh and max at most ${MAX_HOLD_MS / 60_000} minutes each, then medium until the next prompt; low lasts only for the turn it is answered in.`
   )
 }
 

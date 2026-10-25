@@ -43,6 +43,7 @@ describe('controls', () => {
       'changing a shared interface (API, schema, data format, config contract) that 3 or more places use',
       'a bug whose cause is still unknown after 3 attempts',
       'a change across 3 or more modules or services that must ship together',
+      'a design or architecture flaw in the code that a fix did not resolve, or designing or redesigning how a module or service is built',
     ])
     expect([r.xhigh[0].code, r.high[0].code], 'pane.test.ts:others-unchanged').toEqual(['the same test or check fails a 3rd time', '3 or more files that must stay consistent'])
     expect(levelRules(countsIn(STANDARD, true)).max[0].code, 'pane.test.ts:budget-keeps-design-max').toBe('changing a shared interface (API, schema, data format, config contract) that 2 or more places use')
@@ -123,7 +124,7 @@ describe('controls', () => {
         // No Svg on the terminal: 1k medium and 5k max tokens, the column 20 marks wide, 3 medium and 17 max.
         expect([svg, await ui.find({ type: 'Text', text: /^[0-9]{2}:[0-9]{2} ░{3}█{17} +6\.0k$/ }) !== undefined], `pane.test.ts:${surface}:rows`).toEqual([undefined, true])
       } else {
-        expect(/^Effort chart: output tokens per 15 minutes from [0-9]{2}:[0-9]{2} to [0-9]{2}:[0-9]{2}; medium 1\.0k, high 0, extra high 0, max 5\.0k\.$/.test(svg?.props?.alt ?? ''), `pane.test.ts:${surface}:svg`).toBe(true)
+        expect(/^Effort chart: output tokens per 15 minutes from [0-9]{2}:[0-9]{2} to [0-9]{2}:[0-9]{2}; low 0, medium 1\.0k, high 0, extra high 0, max 5\.0k\.$/.test(svg?.props?.alt ?? ''), `pane.test.ts:${surface}:svg`).toBe(true)
         // A fixed frame: the drawing never grows with the pane or the data.
         expect([svg?.props?.width, svg?.props?.height], `pane.test.ts:${surface}:fixed-frame`).toEqual([340, 190])
       }
@@ -166,7 +167,7 @@ describe('controls', () => {
     await clock.advance(60_000)
     await step($, 2)
     const saved: any = await $store.get('chart:S1')
-    const medium = saved.buckets.reduce((a: number, b: any) => a + b.tok[0], 0)
+    const medium = saved.buckets.reduce((a: number, b: any) => a + b.tok[1], 0)
     expect(medium, 'pane.test.ts:saved-a-minute-later').toBe(3_000 + 1_000 + 2_000 + 3_000)
   })
 

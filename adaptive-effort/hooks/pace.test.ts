@@ -67,7 +67,7 @@ describe('weekly budget', () => {
     log = recordStep(log, 'high', 100 * 60_000, 2_000)
     log = recordStep(log, 'medium', 140 * 60_000, 1_900)
     const use = lastHourUse(log, 141 * 60_000)
-    expect(use, 'pace.test.ts:last-hour').toEqual({ calls: 3, tokens: [1_900, 12_000, 0, 0] })
+    expect(use, 'pace.test.ts:last-hour').toEqual({ calls: 3, tokens: [0, 1_900, 12_000, 0, 0] })
     expect(rulesLine(STANDARD, undefined, use).includes('This session, last hour: 3 calls, 14k output tokens (medium 1.9k, high 12k).'), 'pace.test.ts:session-line').toBe(true)
     expect(usageLine(undefined, lastHourUse(EMPTY_CHART, 0)).includes('This session, last hour: no calls yet.'), 'pace.test.ts:session-none').toBe(true)
   })

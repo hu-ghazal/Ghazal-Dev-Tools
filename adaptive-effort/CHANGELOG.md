@@ -3,6 +3,26 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.6.0 (2026-10-25)
+
+Design flaws escalate, xhigh gets the 10-minute limit, and a low level for questions and conversation.
+
+- **Design escalation.** A design or architecture flaw found in the code (a wrong module structure, a broken
+  interface contract, a design that cannot meet its requirement) is now an xhigh condition. A design flaw that a fix
+  did not resolve, or designing or redesigning how a module or service is built, is a max condition. Before, such
+  work matched no condition and stayed at high.
+- **Xhigh has its own 10-minute clock,** like max: after ten minutes in a row it drops to medium until the next
+  prompt. `/adaptive-effort` names which level is held.
+- **Low.** Claude can answer `EFFORT=low` for questions, a one-to-one back-and-forth conversation or information
+  asked for, apart from starting the work. Low lasts only for its turn, and a rise from it applies at once. The pane
+  has a **Low** card under Medium, Settings has a Low definition, and the chart and table have a low column.
+  Definitions and charts saved before 1.6.0 still load, with the default low and a zero low column.
+- **Early-week pace.** In the first 12 hours of a week, with no recent rate, the usage line and `/adaptive-effort`
+  say it is too early in the week to read a pace, and the budget step stays off. Before, 1% used an hour into the
+  week read as over budget.
+- Tests: the new levels and limits (`levels.test.ts`), low in the pane, Settings, chart and pace (`low.test.ts`),
+  and the existing tests updated for the five chart columns; the new tests fail on 1.5.6.
+
 ## 1.5.6 (2026-10-22)
 
 Fast mode at Medium is removed.

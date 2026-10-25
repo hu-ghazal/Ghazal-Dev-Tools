@@ -5,10 +5,11 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 //   I1  the effort sent is never above Claude's latest answer (medium before any answer), except while the 60 s hold
 //       keeps the current effort unchanged;
 //   I3  the effort never changes sooner than 60 s after the last change;
-//   I6  a non-max answer applies at the first step once the current effort has stood 60 s;
-//   I8  after the 10-minute cap stops max during a turn, max is sent again only after a max answer given at or after it;
-//   I9  on the first step after a prompt, a max answer given at or after the last cap applies once the effort has
-//       stood 60 s (a max run that ran out while idle does not block it).
+//   I6  a medium or high answer applies at the first step once the current effort has stood 60 s;
+//   I8  after the 10-minute cap stops xhigh or max during a turn, that level is sent again only after an answer of it
+//       given at or after the cap (each has its own clock);
+//   I9  on the first step after a prompt, an xhigh or max answer given at or after its last cap applies once the effort
+//       has stood 60 s (a run that ran out while idle does not block it).
 // The hand-written stories in answer.test.ts missed the idle path once; this sweeps the combinations instead.
 
 const OPUS = 'claude-opus-5-5'
@@ -46,11 +47,11 @@ async function sweep($: any, on: any, seed: number, events: number) {
   await $.session.start({ cwd: '/work', surface: 'desktop', isInteractive: true })
   let now = 0
   let latest = 0 // medium before any answer
-  let maxAnswerAt: number | undefined
+  const answerAt: Record<number, number | undefined> = {}
   let prev: string | undefined
   let lastChange = -Infinity
-  let capAt: number | undefined
-  let lastCap: number | undefined
+  const capAt: Record<number, number | undefined> = {}
+  const lastCap: Record<number, number | undefined> = {}
   let fresh = true
   let index = 0
   const log: string[] = []
@@ -67,7 +68,7 @@ async function sweep($: any, on: any, seed: number, events: number) {
     }
     if (r() < 0.35) {
       latest = Math.floor(r() * 4)
-      if (latest === 3) maxAnswerAt = now
+      if (latest >= 2) answerAt[latest] = now
       await $.tool.call({ tool: 'Bash', command: `echo "EFFORT=${L[latest]}"` })
       log.push(`${now / 1000}s answer ${L[latest]}`)
     }
@@ -84,17 +85,20 @@ async function sweep($: any, on: any, seed: number, events: number) {
     // Above the latest answer only while the 60 s hold keeps the current effort unchanged.
     expect(L.indexOf(sent as any) <= latest || (sent === prev && !stood), fail('I1 above the latest answer', sent)).toBe(true)
     if (prev !== undefined && sent !== prev) expect(stood, fail('I3 changed within 60 s', sent)).toBe(true)
-    if (latest < 3 && (prev === undefined || stood)) expect(sent, fail('I6 non-max answer not applied', sent)).toBe(L[latest])
-    if (latest === 3 && fresh && stood && maxAnswerAt !== undefined && (lastCap === undefined || maxAnswerAt >= lastCap))
-      expect(sent, fail('I9 max answer blocked on a new prompt', sent)).toBe('max')
-    if (latest === 3 && prev === 'max' && sent === 'medium' && stood) {
-      capAt ??= now
-      lastCap = now
+    if (latest < 2 && (prev === undefined || stood)) expect(sent, fail('I6 medium or high answer not applied', sent)).toBe(L[latest])
+    const at = answerAt[latest]
+    if (latest >= 2 && fresh && stood && at !== undefined && (lastCap[latest] === undefined || at >= (lastCap[latest] as number)))
+      expect(sent, fail('I9 capped-level answer blocked on a new prompt', sent)).toBe(L[latest])
+    if (latest >= 2 && prev === L[latest] && sent === 'medium' && stood) {
+      capAt[latest] ??= now
+      lastCap[latest] = now
     }
     fresh = false
-    if (sent === 'max' && capAt !== undefined) {
-      expect(maxAnswerAt !== undefined && maxAnswerAt >= capAt, fail('I8 spent max came back', sent)).toBe(true)
-      capAt = undefined
+    const si = L.indexOf(sent as any)
+    if (si >= 2 && capAt[si] !== undefined) {
+      const a = answerAt[si]
+      expect(a !== undefined && a >= (capAt[si] as number), fail('I8 spent run came back', sent)).toBe(true)
+      capAt[si] = undefined
     }
     if (sent !== prev) lastChange = now
     prev = sent
