@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, perDay } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, answerName, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, perDay } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -113,11 +113,12 @@ async function saveChart($: EngineInterface, log: ChartLog, id?: string) {
 }
 
 // One short line per level card: a four-word general definition.
-const SUMMARY: Record<Raised | 'medium', string> = {
+const SUMMARY: Record<Raised | 'medium' | 'low', string> = {
   max: 'Hard-to-undo or unexplained problems',
   xhigh: 'Repeated or surprising failures',
   high: 'Many parts, many checks',
   medium: 'Clear steps, easily undone',
+  low: 'Questions, conversation, information',
 }
 const cardLine = (l: Raised, n: number) => (n === 0 ? SUMMARY[l] : `${SUMMARY[l]} · ${difficultyWord(n)}`)
 const describe = (t: Thresholds) => RAISED.map(l => `${l} ${difficultyWord(t[l])}`).join(', ')
@@ -207,22 +208,27 @@ export const register: Register = on => {
     const b = await budget($, now, false)
     const r = levelRules(countsIn(t, overBudget(b)), await read($, definitions))
     const answer = h.answer
-      ? `Claude answered EFFORT=${LEVELS[h.answer.level]} ${mins(now - h.answer.at)} min ago; it holds until Claude answers again.`
+      ? `Claude answered EFFORT=${answerName(h.answer.level)} ${mins(now - h.answer.at)} min ago; it holds until Claude answers again.`
       : 'Claude has not answered EFFORT yet: medium.'
-    const rules = DEFINED.map(l => `${l}${l === 'medium' ? '' : ` (${difficultyWord(t[l])})`}: ${r[l].map(ruleText).join('; ')}`).join('\n')
+    const rules = DEFINED.map(l => `${l}${l === 'medium' || l === 'low' ? '' : ` (${difficultyWord(t[l])})`}: ${r[l].map(ruleText).join('; ')}`).join('\n')
     const week = !b
       ? 'Weekly budget: no 7-day reading yet, no cap.'
       : `Weekly budget: ${b.used}% used, ${fmt(b.left)}% left over ${fmt(b.hoursLeft)} h, so ${fmt(b.allowed * 24)}% a day allowed; ` +
-        `spending ${fmt(b.burn * 24)}% a day (${b.basis === 'recent' ? 'recent readings' : 'the week so far'}). ` +
+        (b.basis === 'early'
+          ? 'too early in the week to read a pace. '
+          : `spending ${fmt(b.burn * 24)}% a day (${b.basis === 'recent' ? 'recent readings' : 'the week so far'}). `) +
         (b.h >= 1
           ? 'Within budget.'
           : `Over budget: it pays ${Math.round(b.h * 100)}% of the spend, so every count is one higher and the higher levels need more reason; an answer Claude gave is never cut down.`)
-    const capped = h.max.capped ? ` Max ran ${MAX_HOLD_MS / 60_000} minutes and is held at medium until a new prompt.` : ''
+    const held = [h.max.capped ? 'Max' : '', h.xhigh?.capped ? 'Extra high' : ''].filter(x => x)
+    const capped = held.length
+      ? ` ${held.join(' and ')} ran ${MAX_HOLD_MS / 60_000} minutes and ${held.length > 1 ? 'are' : 'is'} held at medium until a new prompt.`
+      : ''
     return {
       text:
         `version ${manifest.version} is ${(await read($, enabled)) ? 'on' : 'off'}; last applied effort: ${await read($, level)}.\n` +
         `${answer}\nThresholds in force (saved default: ${describe(await read($, saved))}):\n${rules}\n` +
-        `Limits: a change waits until the current effort has stood ${MIN_DWELL_MS / 1000} s; max runs at most ${MAX_HOLD_MS / 60_000} minutes in a row.${capped}\n` +
+        `Limits: a change waits until the current effort has stood ${MIN_DWELL_MS / 1000} s; xhigh and max each run at most ${MAX_HOLD_MS / 60_000} minutes in a row.${capped}\n` +
         week,
     }
   })
@@ -233,7 +239,7 @@ export const register: Register = on => {
   const SPLIT_EXPLAIN = 'Off by default. On, Claude adds a quick score out of ten when it answers Max: how well the work splits into clear pieces. A score of the number above or more sends High to plan, then Medium for each piece; otherwise Max stands. Set the number with − and +; it is kept for new sessions.'
   const EXPLAIN = 'Claude picks a level whose conditions match the work; where several match, it chooses by the work and the usage. Easier or Harder changes the conditions; the effort follows Claude\'s next answer.'
   // Dark text on the light level pill, white on the dark ones; the budget warning in amber.
-  const PILL_TEXT: Record<EffortLevel, string> = { medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
+  const PILL_TEXT: Record<EffortLevel, string> = { low: '#1A1A18', medium: '#1A1A18', high: '#FFFFFF', xhigh: '#FFFFFF', max: '#FFFFFF' }
   const WARN = '#E8A33D'
   const YELLOW = '#F2C94C'
   // The level cards' name pills in dark blue; the Effort now pill keeps its level's colour.
@@ -289,7 +295,7 @@ export const register: Register = on => {
         </Box>
         {DEFINED.map(l => (
           <Box key={`defs-${l}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
-            <Text bold color={GRAY} backgroundColor={CARD_PILL}>{` ${l === 'medium' ? 'Medium' : TITLE[l]} `}</Text>
+            <Text bold color={GRAY} backgroundColor={CARD_PILL}>{` ${l === 'medium' ? 'Medium' : l === 'low' ? 'Low' : TITLE[l]} `}</Text>
             {d[l].map((_, i) => (
               <Box key={`defs-${l}-${i}`} flexDirection="column">
                 {field(l, i, 'code')}
@@ -353,6 +359,12 @@ export const register: Register = on => {
             <Text dimColor>{SUMMARY.medium}</Text>
           </Box>
         )}
+        {edit ? null : (
+          <Box key="level-low" flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderDimColor paddingX={1}>
+            <Text bold color={GRAY} backgroundColor={CARD_PILL}> Low </Text>
+            <Text dimColor>{SUMMARY.low}</Text>
+          </Box>
+        )}
         {!edit && isOn && sp.on ? <Text dimColor>{`Break to simple (experimental) is on${sp.last ? `; last: ${splitText(sp.last.score, sp.trigger)}, ${sp.last.pass ? 'High to plan' : 'Max stood'}` : '; no Max answer yet'}.`}</Text> : null}
         {over ? <Text color={WARN}>{`⚠ ${b?.used}% of this week's limit used. At ${b?.basis === 'recent' ? 'the pace of the last few hours' : "this week's pace"} you would use ${b ? perDay(b.burn) : '?'}% of it a day, more than the ${b ? perDay(b.allowed) : '?'}% a day the week allows. So High, Extra high and Max are one step harder to reach until that eases.`}</Text> : null}
         <Box flexDirection="column">
@@ -404,6 +416,8 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     fresh = true
+    // Low lasts only for the turn it was answered in: a new prompt sends medium until Claude answers again.
+    if (e.agentId === undefined) await update($, hold, s => (s.answer && s.answer.level < 0 ? { ...s, answer: { ...s.answer, level: 0 } } : s))
     return next(e)
   })
 
@@ -460,16 +474,19 @@ export const register: Register = on => {
     // The 7-day readings are kept for the budget step and /adaptive-effort; the budget never lowers the effort.
     await budget($, now, true)
     const cap = capMax(applied(want), h.max, now, fresh, h.answer?.at)
+    // xhigh has the same 10 minutes, on its own clock.
+    const capX = capMax(cap.effort, h.xhigh ?? { capped: false }, now, fresh, h.answer?.at, 'xhigh')
     fresh = false
     let { current, changedAt } = h
-    const held = dwell(current, cap.effort, changedAt, now)
+    const held = dwell(current, capX.effort, changedAt, now)
     const effort = applied(Math.min(top, LEVELS.indexOf(held.effort)))
     const max = trackMax(cap.clock, effort, now)
+    const xhigh = trackMax(capX.clock, effort, now, 'xhigh')
     if (held.changed || effort !== current) {
       current = effort
       changedAt = now
     }
-    await update($, hold, s => ({ ...s, current, changedAt, max }))
+    await update($, hold, s => ({ ...s, current, changedAt, max, xhigh }))
     await update($, level, () => effort)
     const status = statusText(effort, e.model)
     if (status !== shown) {

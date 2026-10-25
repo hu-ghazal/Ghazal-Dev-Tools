@@ -12,14 +12,14 @@
 
 <p align="center">
   <b>An automatic gearbox for Claude's thinking.</b><br>
-  A Claude Code plugin (mod) that lets Claude choose its own reasoning effort, from medium to max, from the work in
+  A Claude Code plugin (mod) that lets Claude choose its own reasoning effort, from low to max, from the work in
   front of it, your usage limits and your project, by clear rules you control.
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.5.6" src="https://img.shields.io/badge/version-1.5.6-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.6.0" src="https://img.shields.io/badge/version-1.6.0-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
-  <img alt="Gears" src="https://img.shields.io/badge/gears-medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
+  <img alt="Gears" src="https://img.shields.io/badge/gears-low%20%C2%B7%20medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
   <img alt="License PolyForm Noncommercial" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-2b2f36?style=for-the-badge">
 </p>
@@ -32,12 +32,17 @@ shifting smooth and the most expensive gear short.
 
 ## ✨ Highlights
 
-- 🔴 **Auto mode.** Claude picks its own gear for the work in front of it: medium, high, xhigh or max.
+- 🔴 **Auto mode.** Claude picks its own gear for the work in front of it: low, medium, high, xhigh or max.
+- 🏗️ **Design flaws shift up.** A design or architecture flaw found in the code calls for xhigh; one that a fix did
+  not resolve, or designing how a module or system is built, calls for max.
+- 💬 **Low for talk.** Questions, a back-and-forth conversation or information you asked for run at low, apart from
+  the work itself; the next prompt starts again from medium.
 - ⚙️ **Clear shift rules.** Each gear has counted conditions (attempts, files, systems, steps), not vague feelings,
   each in a version for code work and one for any other work. You can rewrite them in Settings.
 - 🎚️ **You set the difficulty.** Make max, xhigh or high harder or easier to reach, one step at a time.
 - ⏱️ **Smooth shifting.** At least 60 seconds between changes, so the effort never flickers.
-- 🛑 **Rev limiter on max.** Ten minutes in a row at most, then back to medium until your next prompt.
+- 🛑 **Rev limiter on xhigh and max.** Ten minutes in a row at most for each, then back to medium until your next
+  prompt.
 - 💰 **Budget aware.** When your weekly usage runs ahead of the week, every gear gets one step harder to reach.
 - 🧠 **Weighs cost and project.** Claude sees your usage and its own recent output before each answer, and reads the
   project for what makes a mistake costly.
@@ -102,12 +107,15 @@ At the default thresholds; **Harder** and **Easier** move the numbers, **Setting
 | <img alt="max" src="https://img.shields.io/badge/max-042C53?style=flat-square"> | changing a shared interface (API, schema, data format, config contract) that 2 or more places use | a decision that is hard to undo and that 2 or more other parts depend on |
 | | a bug whose cause is still unknown after 2 attempts | a problem whose cause is still unknown after 2 attempts |
 | | a change across 2 or more modules or services that must ship together | a change across 2 or more separate parts that must change together |
+| | a design or architecture flaw in the code that a fix did not resolve, or designing or redesigning how a module or service is built | a design flaw that a fix did not resolve, or deciding how a whole system is built |
 | <img alt="xhigh" src="https://img.shields.io/badge/xhigh-185FA5?style=flat-square"> | the same test or check fails a 3rd time | the same problem comes back a 3rd time |
 | | a test or check that passed earlier fails again | something believed done turns out wrong |
 | | the code behaves differently from what reading it says | a result differs from what was expected |
+| | a design or architecture flaw found in the code: a wrong module structure, a broken interface contract, or a design that cannot meet its requirement | a flaw found in how the work is designed or put together |
 | <img alt="high" src="https://img.shields.io/badge/high-378ADD?style=flat-square"> | 3 or more files that must stay consistent | 3 or more pieces that must agree with each other |
 | | 5 or more steps, each confirmed by running something (build, test, script) | 5 or more steps, each needing its own check |
 | <img alt="medium" src="https://img.shields.io/badge/medium-B5D4F4?style=flat-square"> | anything smaller: a clear next step, such as reading, renames, docs, config values, a fix confirmed on its first run | anything smaller: a clear next step where a mistake is easy to see and undo |
+| <img alt="low" src="https://img.shields.io/badge/low-DCE9F7?style=flat-square"> | questions, a one-to-one back-and-forth conversation, or information the user asked for, apart from starting the work; never while editing files, running checks or doing the job itself | questions, a one-to-one back-and-forth conversation, or information asked for, apart from starting the work; never while doing the job itself |
 
 When the work changes, Claude answers again, and drops back as soon as the hard part ends. Nothing here is tied to one
 project or language: the conditions and the signals apply to any repository.
@@ -118,13 +126,16 @@ check you already ask Claude to echo.
 ### 🛡️ Limits the mod applies
 
 - **60 seconds between changes**, so the effort does not flicker.
-- **Max for at most 10 minutes in a row**, then medium until your next prompt.
+- **Xhigh and max for at most 10 minutes in a row each**, then medium until your next prompt. Each has its own
+  clock, and `/adaptive-effort` names the level that is held.
+- **Low lasts only for the turn it is answered in.** The next prompt starts from medium until Claude answers again,
+  and a rise from low applies at once, without the 60-second wait.
 - **Weekly budget step:** while you are spending faster than your week allows, every count in the rules goes one
   higher, so the higher levels need more reason. The budget never lowers an answer Claude already gave.
 
 ### 🤖 Models
 
-Opus, Fable and Sonnet 5 and later, from medium to max. Other models and subagent steps are left alone.
+Opus, Fable and Sonnet 5 and later, from low to max. Other models and subagent steps are left alone.
 
 ## 🎚️ You control your usage, and watch it live
 
@@ -138,6 +149,8 @@ that trade-off in your hands:
 - **Your weekly limit is watched too.** When your usage runs ahead of the week, every gear gets one step harder on its
   own, and the pane says so in amber, with the week's use so far and the
   per-day pace against what the week allows a day.
+  In the first 12 hours of a week, with no recent rate to go on, `/adaptive-effort` says it is too early in the week
+  to read a pace, and the week is not counted as over budget.
 
 ## 🎛️ The Thinking effort pane
 
@@ -146,13 +159,15 @@ The pane opens at session start (`/adaptive-effort pane` brings it to the front)
 - the effort now, as a coloured pill (or **Off**), the **Turn off** / **Turn on** button, a **Settings** button, and one
   line on how Auto works;
 - one card each for **Max**, **Extra high** and **High**, with a short definition of the level, your setting when
-  you changed it (harder +1, easier -1) and **Easier** / **Harder** buttons, then a card for **Medium**;
+  you changed it (harder +1, easier -1) and **Easier** / **Harder** buttons, then a card for **Medium** and one for
+  **Low** (questions, conversation, information);
 - **Save as default** and **Reset to default**;
 - the live chart and table below.
 
 ### 📊 The live chart
 
-- **Output tokens per 15 minutes, by effort.** One column per quarter hour, stacked by level, starting at the left.
+- **Output tokens per 15 minutes, by effort.** One column per quarter hour, stacked by level from low to max,
+  starting at the left.
   Output tokens (thinking included) are what the effort changes; the context Claude rereads costs the same at every
   level, so it is not counted.
 - **A frame of fixed size.** The tallest column fills the height and 24 hours fit the width, so the chart never grows.
@@ -256,7 +271,7 @@ claude plugin validate path/to/adaptive-effort
 claude plugin test path/to/adaptive-effort
 ```
 
-The tests cover answer parsing, the hold and the max limit, the budget step and the usage line, the conditions and
+The tests cover answer parsing, the low level, the hold and the xhigh and max limits, design escalation, the budget step and the usage line, the conditions and
 your own definitions, the pane, its buttons and Settings, saved defaults, model ranges, and the chart: its buckets, the 24-hour deletion, the table, the fixed frame, and
 keeping it across a restart and a plugin reload.
 

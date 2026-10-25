@@ -3,7 +3,7 @@
 // noncommercial purposes; please keep this notice and the licence with any copy, and credit the original.
 // Commercial use needs a separate licence.
 
-export type EffortLevel = 'medium' | 'high' | 'xhigh' | 'max'
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 // The hold base, the max clock and Claude's latest EFFORT answer (level 0-3, when
 // it was given); kept in $.state so a reload keeps them.
@@ -11,6 +11,8 @@ export type Hold = {
   current?: EffortLevel
   changedAt?: number
   max: { since?: number; capped: boolean }
+  // The same 10-minute clock for xhigh.
+  xhigh?: { since?: number; capped: boolean; endedAt?: number }
   answer?: { level: number; at: number }
 }
 
@@ -24,12 +26,12 @@ export type Thresholds = { max: number; xhigh: number; high: number }
 // high, xhigh and max.
 export type ChartBucket = {
   at: number
-  n: [number, number, number, number]
-  tok?: [number, number, number, number]
+  n: number[]
+  tok?: number[]
   // Calls whose response reported usage: what output per call divides by.
-  nt?: [number, number, number, number]
+  nt?: number[]
   // The output tokens of those calls, what output per call divides.
-  ct?: [number, number, number, number]
+  ct?: number[]
 }
 
 // The pane's chart of this session: buckets of the last 24 hours and the effort last sent.
@@ -48,7 +50,7 @@ declare module 'claude-code' {
       thresholds: Thresholds
       saved: Thresholds
       chart: ChartLog
-      definitions: Record<'max' | 'xhigh' | 'high' | 'medium', { count?: string; shift?: number; code: string; general: string }[]>
+      definitions: Record<'max' | 'xhigh' | 'high' | 'medium' | 'low', { count?: string; shift?: number; code: string; general: string }[]>
       editing: boolean
       split: { on: boolean; trigger: number; last?: { score: number; pass: boolean; at: number } }
     }

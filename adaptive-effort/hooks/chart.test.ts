@@ -18,8 +18,8 @@ describe('chart log', () => {
     l = step(l, 'max', 5 * MIN, 6_400)
     l = step(l, 'high', 15 * MIN, 1_500)
     expect(l.buckets.map(b => [b.at, b.n, b.tok]), 'chart.test.ts:buckets').toEqual([
-      [0, [2, 0, 0, 1], [700, 0, 0, 6_400]],
-      [15 * MIN, [0, 1, 0, 0], [0, 1_500, 0, 0]],
+      [0, [0, 2, 0, 0, 1], [0, 700, 0, 0, 6_400]],
+      [15 * MIN, [0, 0, 1, 0, 0], [0, 0, 1_500, 0, 0]],
     ])
   })
 
@@ -33,18 +33,18 @@ describe('chart log', () => {
 
   // Calls recorded without tokens would draw empty columns and pull the averages down.
   test('calls without tokens are neither averaged nor drawn: the chart starts at the first tokens', () => {
-    const old = { buckets: [{ at: 0, n: [1, 20, 0, 0] }, { at: 15 * MIN, n: [18, 1, 0, 0] }, { at: 45 * MIN, n: [0, 20, 0, 0] }], last: 'high' } as any
+    const old = { buckets: [{ at: 0, n: [0, 1, 20, 0, 0] }, { at: 15 * MIN, n: [0, 18, 1, 0, 0] }, { at: 45 * MIN, n: [0, 0, 20, 0, 0] }], last: 'high' } as any
     let l = step(old, 'high', 46 * MIN, 438)
     l = step(l, 'medium', 47 * MIN, 4_185)
     const v = chartView(l, 48 * MIN)
-    expect([v.calls, v.tokens, v.bars.map(b => b.at / MIN)], 'chart.test.ts:old-bucket').toEqual([[1, 1, 0, 0], [4_185, 438, 0, 0], [45]])
+    expect([v.calls, v.tokens, v.bars.map(b => b.at / MIN)], 'chart.test.ts:old-bucket').toEqual([[0, 1, 1, 0, 0], [0, 4_185, 438, 0, 0], [45]])
     expect(levelRows(v), 'chart.test.ts:per-call').toEqual([
       { level: 'medium', calls: '1', each: '4.2k', share: '91%' },
       { level: 'high', calls: '1', each: '0.4k', share: '9%' },
     ])
-    const mixed = { buckets: [{ at: 45 * MIN, n: [6, 20, 0, 0], tok: [4_185, 438, 0, 0] }], last: 'medium' } as any
+    const mixed = { buckets: [{ at: 45 * MIN, n: [0, 6, 20, 0, 0], tok: [0, 4_185, 438, 0, 0] }], last: 'medium' } as any
     const w = chartView(step(mixed, 'medium', 46 * MIN, 900), 47 * MIN)
-    expect([w.tokens[0], levelRows(w)[0].each, levelRows(w)[0].calls], 'chart.test.ts:mixed-bucket').toEqual([5_085, '0.9k', '1'])
+    expect([w.tokens[1], levelRows(w)[0].each, levelRows(w)[0].calls], 'chart.test.ts:mixed-bucket').toEqual([5_085, '0.9k', '1'])
   })
 
   // One row per level, each figure in its own column.
@@ -57,7 +57,7 @@ describe('chart log', () => {
       { level: 'medium', calls: '2', each: '0.7k', share: '44%' },
       { level: 'high', calls: '1', each: '1.8k', share: '56%' },
     ])
-    expect(shares(v), 'chart.test.ts:shares').toEqual([44, 56, 0, 0])
+    expect(shares(v), 'chart.test.ts:shares').toEqual([0, 44, 56, 0, 0])
     expect(chartTitle(v), 'chart.test.ts:title').toBe('Output tokens per 15 minutes, by effort')
     expect(levelRows(chartView(step(EMPTY_CHART, 'high', 0, 0), 1)), 'chart.test.ts:no-usage').toEqual([])
     // All four levels each get their own row, and the values fit their columns.
@@ -70,14 +70,14 @@ describe('chart log', () => {
 
   test('a saved chart reads back with only its last 24 hours; anything else is not a chart', () => {
     const now = 30 * HOUR
-    const saved = { buckets: [{ at: 2 * HOUR, n: [1, 0, 0, 0], tok: [9, 0, 0, 0] }, { at: 20 * HOUR, n: [0, 1, 0, 0] }], last: 'high', maxRun: { start: 1 } }
-    expect(restored(saved, now), 'chart.test.ts:restored').toEqual({ buckets: [{ at: 20 * HOUR, n: [0, 1, 0, 0], tok: [0, 0, 0, 0], nt: [0, 0, 0, 0], ct: [0, 0, 0, 0] }], last: 'high' })
+    const saved = { buckets: [{ at: 2 * HOUR, n: [0, 1, 0, 0, 0], tok: [0, 9, 0, 0, 0] }, { at: 20 * HOUR, n: [0, 0, 1, 0, 0] }], last: 'high', maxRun: { start: 1 } }
+    expect(restored(saved, now), 'chart.test.ts:restored').toEqual({ buckets: [{ at: 20 * HOUR, n: [0, 0, 1, 0, 0], tok: [0, 0, 0, 0, 0], nt: [0, 0, 0, 0, 0], ct: [0, 0, 0, 0, 0] }], last: 'high' })
     expect([restored('x', now), restored({ buckets: 3 }, now), restored(undefined, now)], 'chart.test.ts:not-a-chart').toEqual([undefined, undefined, undefined])
   })
 
   test('saved charts to delete: nothing in the last 24 hours, not a chart, or past the newest 30', () => {
     const now = 100 * HOUR
-    const chartAt = (at: number) => ({ buckets: [{ at, n: [1, 0, 0, 0], tok: [1, 0, 0, 0] }] })
+    const chartAt = (at: number) => ({ buckets: [{ at, n: [0, 1, 0, 0, 0], tok: [0, 1, 0, 0, 0] }] })
     const saved: [string, unknown][] = [['thresholds', { max: 0 }], ['chart:old', chartAt(now - 25 * HOUR)], ['chart:bad', 7]]
     for (let i = 0; i < MAX_SAVED + 2; i++) saved.push([`chart:s${i}`, chartAt(now - i * MIN)])
     expect(stale(saved, now, ['thresholds']).sort(), 'chart.test.ts:stale').toEqual(['chart:bad', 'chart:old', `chart:s${MAX_SAVED}`, `chart:s${MAX_SAVED + 1}`].sort())
@@ -135,7 +135,7 @@ describe('chart drawing', () => {
     expect(svg.includes(`font-family="sans-serif"><rect width="${SVG_W}" height="${SVG_H}" rx="8" fill="${BACKGROUND}"/>`), 'chart.test.ts:background').toBe(true)
     expect(BACKGROUND, 'chart.test.ts:claude-dark').toBe('#262624')
     expect(['>0<', '>10k<', '>20k<', '>30k<', '>40k<'].every(t => svg.includes(t)), 'chart.test.ts:y-axis').toBe(true)
-    expect(chartAlt(v, label), 'chart.test.ts:alt').toBe('Effort chart: output tokens per 15 minutes from t0 to t15; medium 1.0k, high 40k, extra high 0, max 0.')
+    expect(chartAlt(v, label), 'chart.test.ts:alt').toBe('Effort chart: output tokens per 15 minutes from t0 to t15; low 0, medium 1.0k, high 40k, extra high 0, max 0.')
   })
 
   test('24 columns stay well inside the Svg size bound', () => {
@@ -154,12 +154,12 @@ describe('chart drawing', () => {
     const back = restored(JSON.parse(JSON.stringify(saved)), 21 * 60_000)!
     const r = merged(mem, back)
     expect(r.buckets.map(b => [b.at, b.n, b.ct]), 'chart.test.ts:reload').toEqual([
-      [0, [3, 3, 0, 0], [1500, 2400, 0, 0]],
-      [15 * 60_000, [1, 0, 0, 0], [600, 0, 0, 0]],
+      [0, [0, 3, 3, 0, 0], [0, 1500, 2400, 0, 0]],
+      [15 * 60_000, [0, 1, 0, 0, 0], [0, 600, 0, 0, 0]],
     ])
     expect(merged(EMPTY_CHART, back), 'chart.test.ts:restart').toEqual(back)
     // A bucket only in the save (an older quarter hour) is kept beside memory's own.
-    const older = restored({ buckets: [{ at: -15 * 60_000, n: [2, 0, 0, 0], tok: [9, 0, 0, 0], nt: [2, 0, 0, 0], ct: [9, 0, 0, 0] }] }, 21 * 60_000)!
+    const older = restored({ buckets: [{ at: -15 * 60_000, n: [0, 2, 0, 0, 0], tok: [0, 9, 0, 0, 0], nt: [0, 2, 0, 0, 0], ct: [0, 9, 0, 0, 0] }] }, 21 * 60_000)!
     expect(merged(mem, older).buckets.map(b => b.at), 'chart.test.ts:union').toEqual([-15 * 60_000, 0, 15 * 60_000])
   })
 })

@@ -15,11 +15,13 @@ describe('definitions', () => {
         { code: 'changing a shared interface (API, schema, data format, config contract) that 2 or more places use', general: 'a decision that is hard to undo and that 2 or more other parts depend on' },
         { code: 'a bug whose cause is still unknown after 2 attempts', general: 'a problem whose cause is still unknown after 2 attempts' },
         { code: 'a change across 2 or more modules or services that must ship together', general: 'a change across 2 or more separate parts that must change together' },
+        { code: 'a design or architecture flaw in the code that a fix did not resolve, or designing or redesigning how a module or service is built', general: 'a design flaw that a fix did not resolve, or deciding how a whole system is built' },
       ],
       xhigh: [
         { code: 'the same test or check fails a 3rd time', general: 'the same problem comes back a 3rd time' },
         { code: 'a test or check that passed earlier fails again', general: 'something believed done turns out wrong' },
         { code: 'the code behaves differently from what reading it says', general: 'a result differs from what was expected' },
+        { code: 'a design or architecture flaw found in the code: a wrong module structure, a broken interface contract, or a design that cannot meet its requirement', general: 'a flaw found in how the work is designed or put together' },
       ],
       high: [
         { code: '3 or more files that must stay consistent', general: '3 or more pieces that must agree with each other' },
@@ -28,19 +30,20 @@ describe('definitions', () => {
       medium: [
         { code: 'anything smaller: a clear next step, such as reading, renames, docs, config values, a fix confirmed on its first run', general: 'anything smaller: a clear next step where a mistake is easy to see and undo' },
       ],
+      low: [{ code: "questions, a one-to-one back-and-forth conversation, or information the user asked for, apart from starting the work; never while editing files, running checks or doing the job itself", general: 'questions, a one-to-one back-and-forth conversation, or information asked for, apart from starting the work; never while doing the job itself' }],
     })
   })
 
   test('R2 Harder on max raises the max counts in both versions and leaves the other levels', () => {
     const r = levelRules(countsIn(stepped(STANDARD, 'max', 1), false))
-    expect(r.max.map(x => [x.code, x.general].map(s => s.match(/\d+/)?.[0])), 'definitions.test.ts:R2').toEqual([['3', '3'], ['3', '3'], ['3', '3']])
+    expect(r.max.map(x => [x.code, x.general].map(s => s.match(/\d+/)?.[0])), 'definitions.test.ts:R2').toEqual([['3', '3'], ['3', '3'], ['3', '3'], [undefined, undefined]])
     expect([r.xhigh[0].code, r.high[0].code], 'definitions.test.ts:R2-others').toEqual(['the same test or check fails a 3rd time', '3 or more files that must stay consistent'])
   })
 
   test('R3 over budget every count is one higher in both versions; the design decision keeps 2 places', () => {
     const r = levelRules(countsIn(STANDARD, true))
     const nums = (x: { code: string; general: string }) => [x.code, x.general].map(s => s.match(/\d+(st|nd|rd|th)?/)?.[0])
-    expect([...r.max, ...r.xhigh.slice(0, 1), ...r.high].map(nums), 'definitions.test.ts:R3').toEqual([['2', '2'], ['3', '3'], ['3', '3'], ['4th', '4th'], ['4', '4'], ['6', '6']])
+    expect([...r.max, ...r.xhigh.slice(0, 1), ...r.high].map(nums), 'definitions.test.ts:R3').toEqual([['2', '2'], ['3', '3'], ['3', '3'], [undefined, undefined], ['4th', '4th'], ['4', '4'], ['6', '6']])
   })
 
   test('R4 the line beside the prompt carries both versions of every level, medium included', () => {
