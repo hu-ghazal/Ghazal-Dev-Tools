@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { ChartLog, EffortLevel, Hold, PaceLog } from '../types'
-import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, splitRule, parseSplitAnswer, answerName, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, perDay } from './classify'
+import { LEVELS, RAISED, STANDARD, applied, capMax, countsIn, difficultyWord, editText, dwell, isStandard, levelName, levelRules, ruleText, sameDefinitions, validDefinitions, withDefinition, DEFAULT_DEFINITIONS, DEFINED, DEFINITION_MAX, overBudget, parseEffortAnswer, sameThresholds, statusText, stepped, rulesLine, topLevel, trackMax, trackPace, validThresholds, weeklyBudget, MAX_HOLD_MS, MIN_DWELL_MS, WORK_TOOLS, lowLapsed, splitRule, parseSplitAnswer, answerName, splitGate, splitText, validTrigger, SPLIT_TRIGGER, SPLIT_TRIGGER_MIN, SPLIT_TRIGGER_MAX, perDay } from './classify'
 import type { Definitions, DefinedLevel, Raised, Thresholds } from './classify'
 import { COLOR, EMPTY_CHART, SAVE_EVERY_MS, lastHourUse, STORE_CHART, SVG_H, SVG_W, TITLE as LEVEL_TITLE, chartAlt, chartSvg, chartTitle, chartView, clockLabel, levelRows, merged, recordStep, restored, stale, TABLE_HEAD, textRows } from './chart'
 import { manifest } from './version'
@@ -416,8 +416,8 @@ export const register: Register = on => {
 
   on('turn.start', async ($, e, next) => {
     fresh = true
-    // Low lasts only for the turn it was answered in: a new prompt sends medium until Claude answers again.
-    if (e.agentId === undefined) await update($, hold, s => (s.answer && s.answer.level < 0 ? { ...s, answer: { ...s.answer, level: 0 } } : s))
+    // A new prompt does not reset low: it may be another simple question. Low ends when the work starts
+    // (tool.call, WORK_TOOLS) or MAX_HOLD_MS after the answer (turn.step, lowLapsed).
     return next(e)
   })
 
@@ -426,6 +426,8 @@ export const register: Register = on => {
     if (e.agentId !== undefined || r.deny !== undefined) return r
     const extra: string[] = []
     if (await read($, enabled)) {
+      // The work started: low ends, and the next step sends medium until Claude answers again.
+      if (WORK_TOOLS.has(e.tool)) await update($, hold, s => (s.answer && s.answer.level < 0 ? { ...s, answer: { ...s.answer, level: 0 } } : s))
       // Claude's effort answer: only the main loop's own echo.
       if (e.tool === 'Bash') {
         const ev = e as { command?: unknown; input?: { command?: unknown } }
@@ -469,8 +471,8 @@ export const register: Register = on => {
     }
     const now = await $.clock.now()
     const h = await read($, hold)
-    // Claude's latest answer decides; before the first answer, medium.
-    const want = Math.min(top, h.answer?.level ?? 0)
+    // Claude's latest answer decides; before the first answer, medium. A low answer lasts at most MAX_HOLD_MS.
+    const want = Math.min(top, lowLapsed(h.answer?.level ?? 0, h.answer?.at, now) ? 0 : h.answer?.level ?? 0)
     // The 7-day readings are kept for the budget step and /adaptive-effort; the budget never lowers the effort.
     await budget($, now, true)
     const cap = capMax(applied(want), h.max, now, fresh, h.answer?.at)

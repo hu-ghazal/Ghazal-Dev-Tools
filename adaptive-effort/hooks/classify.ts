@@ -91,6 +91,18 @@ export function dwell(
 export const MAX_HOLD_MS = 600_000
 
 /**
+ * Low is for a question or information apart from starting the work, so it ends when the work starts, never at a
+ * prompt: the next prompt may be another simple question. The tools that do the work: an edit, a write, a notebook
+ * edit, a subagent or a workflow. Reads and shell commands also serve questions, so they keep low; low still returns
+ * to medium MAX_HOLD_MS after it was answered (`lowLapsed`).
+ */
+export const WORK_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit', 'Agent', 'Task', 'Workflow'])
+
+/** A low answer older than MAX_HOLD_MS returns to medium. */
+export const lowLapsed = (level: number, answeredAt: number | undefined, now: number): boolean =>
+  level < 0 && answeredAt !== undefined && now - answeredAt >= MAX_HOLD_MS
+
+/**
  * When the running max was first sent (`since`), whether max is blocked (`capped`), and when the cap last stopped a
  * run of max during a turn (`endedAt`, kept until a new run starts).
  */
@@ -428,10 +440,10 @@ export function usageLine(b: Budget | undefined, session?: { calls: number; toke
   const pace = !b || b.basis === 'early'
     ? ''
     : b.h < 1
-      ? ' Spending faster than the week allows: lean to the lower of the levels that fit, and drop back as soon as the hard part ends.'
+      ? ' Spending faster than the week allows: lean to the lower effort level of those that fit, and drop back to a lower effort level as soon as the hard part ends.'
       : b.h < ROOM_H
-        ? " Close to the week's pace: weigh the work against the pace, and drop back as soon as the hard part ends."
-        : ' Room in the week: a higher level that fits is affordable for hard work; drop back when it ends.'
+        ? " Close to the week's pace: weigh the work against the pace, and drop back to a lower effort level as soon as the hard part ends."
+        : ' Room in the week: a higher level that fits is affordable for hard work; drop back to a lower effort level when it ends.'
   const all = session ? session.tokens.reduce((x, y) => x + y, 0) : 0
   const mine = !session
     ? ''
@@ -444,7 +456,8 @@ export function usageLine(b: Budget | undefined, session?: { calls: number; toke
     `Usage: ${week}${pace}${mine} When the conditions of more than one level fit, the choice among them is yours, by ` +
     'the work in front of you and this usage. Usage never raises a level the conditions do not support. ' +
     'A mistake costs more where no tests would catch it, in production, security or payment code, in a shared or public ' +
-    'repository, or in code not yet read: there answer one level higher, never max on these alone.'
+    'repository, or in code not yet read: there answer one level higher, never max on these alone. ' +
+    'This line sets only the reasoning effort: it never ends, shortens or pauses the work, and is never a reason to stop a turn; finish the work at the level chosen.'
   )
 }
 
@@ -473,7 +486,7 @@ export function rulesLine(
     (why ? ` (Counts in force: ${why}.)` : '') +
     ' When the work changes, echo a new EFFORT; drop back as soon as the hard part ends. ' +
     usageLine(b, session) +
-    ` Limits applied by the mod: ${MIN_DWELL_MS / 1000} s between changes; xhigh and max at most ${MAX_HOLD_MS / 60_000} minutes each, then medium until the next prompt; low lasts only for the turn it is answered in.`
+    ` Limits applied by the mod: ${MIN_DWELL_MS / 1000} s between changes; xhigh and max at most ${MAX_HOLD_MS / 60_000} minutes each, then medium until the next prompt; low ends when the work starts (an edit, a write, a subagent or a workflow) or ${MAX_HOLD_MS / 60_000} minutes after it was answered.`
   )
 }
 
