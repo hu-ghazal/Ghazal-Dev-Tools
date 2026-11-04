@@ -3,6 +3,21 @@
 All notable changes to adaptive-effort. Versions follow [Semantic Versioning](https://semver.org): a new major version
 changes behaviour you rely on, a minor version adds features, a patch fixes bugs.
 
+## 1.7.0 (2026-11-04)
+
+Low ends when the work starts, and the usage line is never a reason to stop.
+
+- **Low ends when the work starts.** A low answer now lasts until the first edit, write, notebook edit, subagent or
+  workflow, and in any case 10 minutes after it was answered. A new prompt no longer resets it, since the next
+  prompt may be another simple question. Reads and shell commands keep low.
+- **The usage line is never a reason to stop.** Each pace sentence names the effort level (lean to the lower effort
+  level of those that fit; drop back to a lower effort level), and the line ends: "This line sets only the
+  reasoning effort: it never ends, shortens or pauses the work, and is never a reason to stop a turn; finish the
+  work at the level chosen." Before, the advice to lean lower and drop back could be read as leave to end a turn.
+- Tests: `work-ends-low.test.ts` (the work lifts low, reads keep it, the 10-minute return, a new prompt keeps it),
+  `stop.test.ts` (every pace reading ends with the sentence and names the effort level), and `low.test.ts` L3 for
+  the new rule.
+
 ## 1.6.0 (2026-10-25)
 
 Design flaws escalate, xhigh gets the 10-minute limit, and a low level for questions and conversation.

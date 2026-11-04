@@ -60,7 +60,7 @@ describe('low in the pane, the chart and the pace', () => {
     expect([DEFINED.at(-1), validDefinitions(old)?.low], 'low.test.ts:S1-old').toEqual(['low', DEFAULT_DEFINITIONS.low])
   })
 
-  test('L3 low lasts only for its turn: the next prompt sends medium until Claude answers again', async ($, on) => {
+  test('L3 a new prompt keeps low until the work starts or Claude answers again', async ($, on) => {
     const clock = mock.clock(on)
     const efforts = harness(on)
     await start($)
@@ -70,7 +70,7 @@ describe('low in the pane, the chart and the pace', () => {
     await clock.advance(2 * MIN)
     await prompt($)
     await step($, 0)
-    expect(efforts, 'low.test.ts:L3').toEqual(['low', 'medium'])
+    expect(efforts, 'low.test.ts:L3').toEqual(['low', 'low'])
   })
 
   test('L4 a rise from low applies at once, without the 60 s hold', async ($, on) => {

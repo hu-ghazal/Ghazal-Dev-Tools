@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img alt="Version 1.6.0" src="https://img.shields.io/badge/version-1.6.0-e10600?style=for-the-badge"></a>
+  <a href="CHANGELOG.md"><img alt="Version 1.7.0" src="https://img.shields.io/badge/version-1.7.0-e10600?style=for-the-badge"></a>
   <img alt="Claude Code mod" src="https://img.shields.io/badge/Claude%20Code-mod-e10600?style=for-the-badge">
   <img alt="Gears" src="https://img.shields.io/badge/gears-low%20%C2%B7%20medium%20%C2%B7%20high%20%C2%B7%20xhigh%20%C2%B7%20max-2b2f36?style=for-the-badge">
   <img alt="No model calls" src="https://img.shields.io/badge/model%20calls-none-2b2f36?style=for-the-badge">
@@ -36,7 +36,7 @@ shifting smooth and the most expensive gear short.
 - 🏗️ **Design flaws shift up.** A design or architecture flaw found in the code calls for xhigh; one that a fix did
   not resolve, or designing how a module or system is built, calls for max.
 - 💬 **Low for talk.** Questions, a back-and-forth conversation or information you asked for run at low, apart from
-  the work itself; the next prompt starts again from medium.
+  the work itself; it ends as soon as the work starts (an edit, a write, a subagent or a workflow).
 - ⚙️ **Clear shift rules.** Each gear has counted conditions (attempts, files, systems, steps), not vague feelings,
   each in a version for code work and one for any other work. You can rewrite them in Settings.
 - 🎚️ **You set the difficulty.** Make max, xhigh or high harder or easier to reach, one step at a time.
@@ -128,8 +128,12 @@ check you already ask Claude to echo.
 - **60 seconds between changes**, so the effort does not flicker.
 - **Xhigh and max for at most 10 minutes in a row each**, then medium until your next prompt. Each has its own
   clock, and `/adaptive-effort` names the level that is held.
-- **Low lasts only for the turn it is answered in.** The next prompt starts from medium until Claude answers again,
-  and a rise from low applies at once, without the 60-second wait.
+- **Low ends when the work starts**: at the first edit, write, notebook edit, subagent or workflow, and in any case
+  10 minutes after it was answered. A new prompt keeps it, since the next prompt may be another simple question.
+  A rise from low applies at once, without the 60-second wait.
+- **The usage line is never a reason to stop.** It sets only the reasoning effort and ends with: "This line sets
+  only the reasoning effort: it never ends, shortens or pauses the work, and is never a reason to stop a turn;
+  finish the work at the level chosen."
 - **Weekly budget step:** while you are spending faster than your week allows, every count in the rules goes one
   higher, so the higher levels need more reason. The budget never lowers an answer Claude already gave.
 
